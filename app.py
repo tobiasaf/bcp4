@@ -1,4 +1,8 @@
 import os
+import gc
+# Forzar recolección de basura al inicio / recarga de página para liberar RAM de sesiones anteriores
+gc.collect()
+
 os.environ['GRPC_ENABLE_FORK_SUPPORT'] = '0'
 import streamlit as st
 import pandas as pd
@@ -195,6 +199,8 @@ st.warning("""
 # 4. Botón de ejecución
 if st.button("Ejecutar Backtesting / Simulación con Ensamble ML", type="primary", use_container_width=True):
     st.session_state.resultados_backtest_integral = None
+    import gc
+    gc.collect()
     
     progress_bar = st.progress(0)
     status_text = st.empty()

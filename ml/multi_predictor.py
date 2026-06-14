@@ -1772,4 +1772,17 @@ def entrenar_y_predecir_todo(
             
     if progress_callback:
         progress_callback(100, "¡Simulación completada con éxito!")
+        
+    # --- OPTIMIZACIÓN EXTREMA DE MEMORIA: Liberar 280 modelos locales ---
+    try:
+        import gc
+        del hgbr_models_fob, hgbr_models_fas
+        del en_models_fob, en_models_fas
+        del mlp_models_fob, mlp_models_fas
+        del gpr_models_fob, gpr_models_fas
+        del modelos
+        gc.collect()
+    except Exception:
+        pass
+        
     return resultados_backtest
