@@ -15,7 +15,7 @@ import ui.charts
 
 # Configuración de página amplia estilo Bloomberg Terminal
 st.set_page_config(
-    page_title="BCPsim - Terminal de Simulación y Backtesting",
+    page_title="Paradigma V0.1 - Terminal de Simulación y Backtesting",
     layout="wide"
 )
 
@@ -25,7 +25,7 @@ st.session_state['es_economista'] = True
 # Inyectar CSS Bloomberg Premium
 inject_custom_css()
 
-st.title("BCPsim: Terminal de Simulación y Backtesting (ML Ensamble)")
+st.title("Paradigma V0.1: Terminal de Simulación y Backtesting (ML Ensamble)")
 st.markdown('<p class="subtitle" style="color: #9EADB6; font-size: 1.1rem; margin-bottom: 2rem;">Simulación recursiva out-of-sample con el Ensamble de Machine Learning de 7 modelos de la BCP</p>', unsafe_allow_html=True)
 
 # 1. Cargar datos
@@ -113,7 +113,7 @@ if campana_seleccionada == '2026/27':
     st.warning("""
     El simulador proyectará la campaña 2026/27 out-of-sample. Ajusta los parámetros base del escenario:
     
-    *Nota de la Prueba de Concepto (PoC):* En la versión final institucional de BCPsim, existirá una mayor cantidad de datos a setear y configurar, incluyendo un Creador de Eventos Causal (Event Builder) que permitirá programar y simular eventos/shocks dinámicos a medida (como paros portuarios, sequías localizadas, picos de brecha cambiaria o regulaciones) que alteren directamente ciertas variables y supuestos en fechas programadas. En esta versión demostrativa de prueba de concepto, solo se cuenta con esta parametrización simplificada basada en las siguientes variables clave.
+    *Nota de la Prueba de Concepto (PoC):* En la versión final institucional de Paradigma V0.1, existirá una mayor cantidad de datos a setear y configurar, incluyendo un Creador de Eventos Causal (Event Builder) que permitirá programar y simular eventos/shocks dinámicos a medida (como paros portuarios, sequías localizadas, picos de brecha cambiaria o regulaciones) que alteren directamente ciertas variables y supuestos en fechas programadas. En esta versión demostrativa de prueba de concepto, solo se cuenta con esta parametrización simplificada basada en las siguientes variables clave.
     """)
     
     col_l1, col_l2, col_l3 = st.columns(3)
