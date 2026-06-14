@@ -45,16 +45,20 @@ df_raw['campaña'] = df_raw['fecha'].apply(obtener_campana)
 campanas_disponibles = sorted(df_raw['campaña'].unique())
 campanas_a_predecir = [c for c in campanas_disponibles if c >= "2021/22"]
 
+# Asegurar que la campaña 2026/27 esté en las opciones
+if '2026/27' not in campanas_a_predecir:
+    campanas_a_predecir.append('2026/27')
+
 # 2. Configurar Campaña y Corte en dos columnas
-st.subheader("1. Configuración del Backtesting")
+st.subheader("1. Configuración del Backtesting / Simulación")
 col_c1, col_c2 = st.columns(2)
 
 with col_c1:
     campana_seleccionada = st.selectbox(
-        "Selecciona la Campaña Triguera a predecir a ciegas:",
+        "Selecciona la Campaña Triguera a simular/predecir:",
         options=campanas_a_predecir,
         index=len(campanas_a_predecir) - 2 if len(campanas_a_predecir) >= 2 else 0,
-        help="El modelo se entrenará con toda la historia previa y simulará la temporada completa a ciegas."
+        help="El modelo se entrenará con toda la historia previa y simulará la temporada completa."
     )
 
 # Calcular fecha de corte (1 de junio del año de inicio)
@@ -66,34 +70,74 @@ fecha_inicio_campana = pd.to_datetime(f"{año_inicio}-06-01")
 fecha_fin_campana = pd.to_datetime(f"{año_inicio + 1}-02-01")
 df_campana_test = df_raw[(df_raw['fecha'] >= fecha_inicio_campana) & (df_raw['fecha'] <= fecha_fin_campana)].sort_values('fecha')
 semanas_opciones = df_campana_test['fecha'].dt.date.tolist()
+
 if len(semanas_opciones) == 0:
     semanas_opciones = [fecha_corte]
 
 with col_c2:
-    opciones_avance = {
-        "Simular 100% a ciegas desde el inicio (Junio)": semanas_opciones[0],
-    }
-    for sem in semanas_opciones:
-        dt_sem = pd.to_datetime(sem)
-        if dt_sem.month == 8 and dt_sem.day <= 7:
-            opciones_avance["Mitad de Siembra (Agosto)"] = sem
-        elif dt_sem.month == 10 and dt_sem.day <= 7:
-            opciones_avance["Periodo Crítico / Espigazón (Octubre)"] = sem
-        elif dt_sem.month == 11 and dt_sem.day <= 20 and dt_sem.day >= 10:
-            opciones_avance["Cosecha Abierta / Presión Oferta (Noviembre)"] = sem
+    if campana_seleccionada == '2026/27':
+        fecha_proyeccion = fecha_corte
+        st.write("")
+        st.info("📅 **Modo En Vivo:** Proyección forward out-of-sample a 35 semanas (hasta Febrero de 2027).")
+    else:
+        opciones_avance = {
+            "Simular 100% a ciegas desde el inicio (Junio)": semanas_opciones[0],
+        }
+        for sem in semanas_opciones:
+            dt_sem = pd.to_datetime(sem)
+            if dt_sem.month == 8 and dt_sem.day <= 7:
+                opciones_avance["Mitad de Siembra (Agosto)"] = sem
+            elif dt_sem.month == 10 and dt_sem.day <= 7:
+                opciones_avance["Periodo Crítico / Espigazón (Octubre)"] = sem
+            elif dt_sem.month == 11 and dt_sem.day <= 20 and dt_sem.day >= 10:
+                opciones_avance["Cosecha Abierta / Presión Oferta (Noviembre)"] = sem
 
-    for idx, sem in enumerate(semanas_opciones):
-        opciones_avance[f"Semana {idx+1}: {sem.strftime('%d-%b-%Y')}"] = sem
+        for idx, sem in enumerate(semanas_opciones):
+            opciones_avance[f"Semana {idx+1}: {sem.strftime('%d-%b-%Y')}"] = sem
 
-    avance_seleccionado = st.selectbox(
-        "Punto de partida en la campaña (Fecha de Inicio):",
-        options=list(opciones_avance.keys()),
-        index=0,
-        help="El simulador inyectará los datos reales hasta esta fecha, y a partir de ella generará predicciones endógenas."
-    )
-    fecha_proyeccion = opciones_avance[avance_seleccionado]
+        avance_seleccionado = st.selectbox(
+            "Punto de partida en la campaña (Fecha de Inicio):",
+            options=list(opciones_avance.keys()),
+            index=0,
+            help="El simulador inyectará los datos reales hasta esta fecha, y a partir de ella generará predicciones endógenas."
+        )
+        fecha_proyeccion = opciones_avance[avance_seleccionado]
 
-# 3. Variables exógenas y opciones
+# 3. MODO EN VIVO 2026/27 (Escenarios agronómicos/financieros)
+clima_scenario = "Neutral Promedio"
+chicago_scenario_val = None
+devaluacion_mensual_pct = 2.0
+
+if campana_seleccionada == '2026/27':
+    st.markdown("---")
+    st.subheader("🌾 Configuración de Escenario - Modo En Vivo 2026/27 (Predecir 2027)")
+    st.warning("⚠️ El simulador proyectará la campaña 2026/27 out-of-sample. Ajusta los parámetros base del escenario:")
+    
+    col_l1, col_l2, col_l3 = st.columns(3)
+    with col_l1:
+        clima_scenario = st.selectbox(
+            "Escenario Climático Agronómico:",
+            options=["Neutral Promedio", "Niña Moderada (Estrés / Lluvias Bajas)", "Niño Favorable (Clima Excelente)"],
+            index=0,
+            help="Determina el comportamiento del NDVI satelital simulado y lluvias estimadas en primavera (período crítico)."
+        )
+    with col_l2:
+        chicago_scenario_val = st.number_input(
+            "Precio Trigo Chicago Proyectado (USD/tn):",
+            min_value=100.0,
+            max_value=500.0,
+            value=210.0,
+            step=5.0,
+            help="Define la señal internacional constante durante la temporada."
+        )
+    with col_l3:
+        devaluacion_mensual_pct = st.slider(
+            "Tasa de Devaluación Oficial Mensual (%):",
+            0.0, 10.0, 2.0, 0.5,
+            help="Define el ritmo de deslizamiento cambiario para simular la brecha y el tipo de cambio oficial."
+        )
+
+# 4. Variables exógenas y opciones
 st.markdown("---")
 st.subheader("2. Parámetros del Simulador y Ensamble")
 col_exo, col_sim = st.columns(2)
@@ -141,6 +185,9 @@ if modo_pesos == "Stress Testing (Ponderación Estática Manual)":
 
 st.markdown("---")
 
+# Nota informativa sobre tiempo de ejecución
+st.warning("⏱️ **Nota de Ejecución:** Debido a que el simulador entrena 7 modelos de Machine Learning en paralelo, el cálculo y la simulación recursiva tomará **entre 1 y 2 minutos**. Por favor, no recargue la página mientras se ejecuta.")
+
 # 4. Botón de ejecución
 if st.button("Ejecutar Backtesting / Simulación con Ensamble ML", type="primary", use_container_width=True):
     st.session_state.resultados_backtest_integral = None
@@ -153,6 +200,9 @@ if st.button("Ejecutar Backtesting / Simulación con Ensamble ML", type="primary
                 variables_exogenas=exogenas,
                 predecir_diferencias=False,
                 fecha_proyeccion=str(fecha_proyeccion),
+                clima_scenario=clima_scenario,
+                chicago_scenario_val=chicago_scenario_val,
+                devaluacion_mensual_pct=devaluacion_mensual_pct,
                 stress_weights=stress_weights
             )
             st.session_state.resultados_backtest_integral = resultados
@@ -167,35 +217,40 @@ if st.session_state.get('resultados_backtest_integral'):
     st.markdown("---")
     st.header("Resultados de Backtesting: Simulación vs Realidad")
     
-    # Tabla de métricas de precisión
-    st.subheader("Métricas de Error Fuera de Muestra (Out of Sample)")
-    metricas = []
-    for target, data in res.items():
-        if not isinstance(data, dict) or 'es_exogena' not in data:
-            continue
-        if data.get('es_exogena', False):
-            metricas.append({
-                'Variable': f"{target} (Exógena)",
-                '🎯 MAPE Test': "0.0% (Inyectado)",
-                'Calidad': "Exógena",
-                'MAE Test': "N/A",
-                'R² Aislado': "N/A",
-            })
-            continue
+    if campana_seleccionada != '2026/27':
+        # Tabla de métricas de precisión
+        st.subheader("Métricas de Error Fuera de Muestra (Out of Sample)")
+        metricas = []
+        for target, data in res.items():
+            if not isinstance(data, dict) or 'es_exogena' not in data:
+                continue
+            if data.get('es_exogena', False):
+                metricas.append({
+                    'Variable': f"{target} (Exógena)",
+                    '🎯 MAPE Test': "0.0% (Inyectado)",
+                    'Calidad': "Exógena",
+                    'MAE Test': "N/A",
+                    'R² Aislado': "N/A",
+                })
+                continue
+                
+            mape = data['mape_test']
+            semaforo = "✅ Excelente" if mape < 10 else "🟡 Aceptable" if mape < 25 else "🔴 Pobre"
             
-        mape = data['mape_test']
-        semaforo = "✅ Excelente" if mape < 10 else "🟡 Aceptable" if mape < 25 else "🔴 Pobre"
-        
-        metricas.append({
-            'Variable': target,
-            '🎯 MAPE Test': f"{mape:.1f}%" if not pd.isna(mape) else "N/A",
-            'Calidad': semaforo,
-            'MAE Test': f"{data['mae_test']:.2f}",
-            'R² Aislado': f"{data['r2_train']:.2f}",
-        })
-        
-    st.table(pd.DataFrame(metricas))
-    
+            metricas.append({
+                'Variable': target,
+                '🎯 MAPE Test': f"{mape:.1f}%" if not pd.isna(mape) else "N/A",
+                'Calidad': semaforo,
+                'MAE Test': f"{data['mae_test']:.2f}",
+                'R² Aislado': f"{data['r2_train']:.2f}",
+            })
+            
+        st.table(pd.DataFrame(metricas))
+    else:
+        st.info("📢 **Modo Proyectivo En Vivo / Proyección 2027**\n\n"
+                "Dado que estás proyectando la campaña futura 2026/27, no existen datos reales observados todavía para "
+                "contrastar (MAE/MAPE/R² no disponibles). Se presentan a continuación las trayectorias proyectadas por el Ensamble y sus bandas de confianza.")
+
     # Multiselect de modelos individuales para mostrar
     st.markdown("---")
     st.subheader("Visualización del Ensamble y Modelos del Stack")
