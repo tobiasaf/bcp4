@@ -77,34 +77,30 @@ st.markdown("---")
 
 # 3. Sliders de Variables de Entrada "Top" en la misma pantalla (organizados en 3 columnas)
 st.subheader("2. Ajustar Variables Iniciales (Simulador)")
+st.info("💡 **Simulación Endógena Activa:** Las variables de **Rendimiento (tn/ha)** y **Camiones Diarios** ahora se calculan dinámicamente día a día en función de las lluvias, la temperatura y la estacionalidad de la cosecha, en lugar de ser exógenas (fijas).")
+
 col_var1, col_var2, col_var3 = st.columns(3)
 
 # Valores por defecto cargados desde la base de datos (o fallbacks seguros si no existen)
 val_chicago = float(estado.get('precio_chicago_usd', 188.10))
-val_fob = float(estado.get('precio_fob_usd', 209.50))
 val_fas_usd = float(estado.get('precio_fas_usd', 175.09))
-val_rinde = float(estado.get('rendimiento_estimado_tn_ha', 2.30))
 val_lluvia = float(estado.get('lluvia_mm', 10.0))
-val_camiones = int(estado.get('descargas_camiones', 800))
 val_tc = float(estado.get('tipo_cambio', 900.0))
 val_brecha = float(estado.get('brecha_cambiaria_pct', 35.0))
 val_temp = float(estado.get('temp_media', 18.0))
 
 with col_var1:
-    st.markdown("**💰 Precios en Dólares**")
-    user_chicago = st.slider("Trigo Chicago (USD/tn)", 100.0, 400.0, val_chicago, step=5.0)
-    user_fob = st.slider("Trigo FOB Oficial (USD/tn)", 100.0, 400.0, val_fob, step=5.0)
-    user_fas_usd = st.slider("Trigo FAS Local (USD/tn)", 50.0, 300.0, val_fas_usd, step=5.0)
+    st.markdown("**💰 Precios en Dólares (USD/tn)**")
+    user_precio_actual = st.slider("Precio FAS Actual", 100.0, 400.0, val_fas_usd, step=5.0, help="Precio físico spot del trigo en el mercado local")
+    user_precio_futuro = st.slider("Precio Futuros fin de campaña", 100.0, 400.0, 215.0, step=5.0, help="Precio pactado para entrega al final de la cosecha (MatbaRofex)")
 
 with col_var2:
-    st.markdown("**🌾 Agronomía y Clima**")
-    user_rinde = st.slider("Rendimiento (tn/ha)", 0.5, 5.0, val_rinde, step=0.1)
+    st.markdown("**🌾 Agronomía y Clima (Exógenas)**")
     user_lluvia = st.slider("Lluvia Semanal (mm)", 0.0, 150.0, val_lluvia, step=1.0)
     user_temp = st.slider("Temp. Media (°C)", 5.0, 40.0, val_temp, step=1.0)
 
 with col_var3:
-    st.markdown("**🚛 Logística y Tipo de Cambio**")
-    user_camiones = st.slider("Camiones Diarios", 100, 2000, val_camiones, step=50)
+    st.markdown("**🚛 Macroeconómico y Cambiario**")
     user_tc = st.slider("Dólar Oficial (ARS)", 500.0, 1500.0, val_tc, step=10.0)
     user_brecha = st.slider("Brecha Cambiaria (%)", 0.0, 150.0, val_brecha, step=5.0)
 
@@ -112,36 +108,28 @@ with col_var3:
 eventos_manuales = []
 datos_futuros = {}
 
-# Clonar el estado base e inyectar las variables que el usuario modificó mediante los sliders
+# Clonar el estado base e inyectar las variables del usuario
 estado_inicial = estado.copy()
-estado_inicial['precio_chicago_usd'] = user_chicago
-estado_inicial['precio_fob_usd'] = user_fob
-estado_inicial['precio_fas_usd'] = user_fas_usd
-estado_inicial['rendimiento_estimado_tn_ha'] = user_rinde
+estado_inicial['precio_fas_usd'] = user_precio_actual
+estado_inicial['precio_futuro_usd'] = user_precio_futuro
+estado_inicial['precio_chicago_usd'] = val_chicago
+estado_inicial['precio_fob_usd'] = user_precio_actual + 34.4
 estado_inicial['lluvia_mm'] = user_lluvia
 estado_inicial['temp_media'] = user_temp
-estado_inicial['descargas_camiones'] = user_camiones
 estado_inicial['tipo_cambio'] = user_tc
 estado_inicial['brecha_cambiaria_pct'] = user_brecha
 
-# Configurar parámetros específicos del shock elegido
+# Configurar parámetros específicos del shock elegido para variables exógenas
 if escenario == "Paro de Camioneros (Logística)":
-    st.info("ℹ️ **Paro de Camioneros**: Reduce el ingreso diario de camiones al puerto en un 80% durante el conflicto.")
-    duracion = st.slider("Duración del Conflicto (días):", 3, 15, 7)
-    dia_inicio = 15
-    impacto_camiones = -float(estado_inicial.get('descargas_camiones', 1000) * 0.8)
-    eventos_manuales.append(EventoProgramado(dia_ejecucion=dia_inicio, variable='descargas_camiones', impacto=impacto_camiones, origen="Inicio de Paro"))
-    eventos_manuales.append(EventoProgramado(dia_ejecucion=dia_inicio + duracion, variable='descargas_camiones', impacto=-impacto_camiones, origen="Fin de Paro"))
+    st.info("ℹ️ **Paro de Camioneros**: Reduce el ingreso diario de camiones al puerto en un 80% durante el conflicto (Días 15 al 22).")
 
 elif escenario == "Bajante del Río Paraná (Desvío River)":
-    st.info("ℹ️ **Bajante del Río Paraná**: Aumenta las descargas de camiones en Bahía Blanca en un 25% y el precio de pizarra local en un 5% por la demanda física inmediata de completamiento.")
+    st.info("ℹ️ **Bajante del Río Paraná**: Desvía carga hacia Bahía Blanca aumentando los camiones en un 25% y presionando al alza el FAS local.")
     datos_futuros['nivel_parana_m'] = [0.5] * dias_simular
 
 elif escenario == "Sequía Severa (La Niña)":
-    st.info("ℹ️ **Sequía Severa**: Reduce lluvias en un 40% e incrementa el precio de Chicago en un 15% como shock de oferta global.")
-    datos_futuros['lluvia_mm'] = [max(0.0, float(estado_inicial.get('lluvia_mm', 10.0)) * 0.6)] * dias_simular
-    precio_chicago = float(estado_inicial.get('precio_chicago_usd', 200.0))
-    datos_futuros['precio_chicago_usd'] = [precio_chicago * 1.15] * dias_simular
+    st.info("ℹ️ **Sequía Severa**: Reduce lluvias en un 60% e impacta progresivamente en el rendimiento y sube los futuros.")
+    datos_futuros['lluvia_mm'] = [max(0.0, user_lluvia * 0.4)] * dias_simular
 
 st.markdown("---")
 
@@ -150,35 +138,35 @@ if st.button("Ejecutar Simulación con tus Parámetros", type="primary", use_con
     motor = MotorSimulacion(estado_inicial, reglas)
     
     with st.spinner("Propagando shock día a día..."):
-        historial = motor.correr(dias=dias_simular, eventos_manuales=eventos_manuales, datos_futuros_conocidos=datos_futuros)
+        historial = motor.correr(dias=dias_simular, escenario=escenario, eventos_manuales=eventos_manuales, datos_futuros_conocidos=datos_futuros)
         
         # Procesar resultados
         df_sim = pd.DataFrame([s.valores for s in historial])
         df_sim['dia'] = df_sim.index
         
-        # Graficar variables clave: Precio Pizarra, FAS y Descarga de Camiones
+        # Graficar variables clave
         st.subheader("3. Resultados Proyectados")
         
         col_res1, col_res2 = st.columns(2)
         
-        # Gráfica de Precios en Dólares (las variables "más top")
+        # Gráfica de Precios en Dólares
         with col_res1:
-            st.markdown("**📈 Evolución de Precios en Dólares (USD/tn)**")
-            df_precios_usd = df_sim[['dia', 'precio_chicago_usd', 'precio_fob_usd', 'precio_fas_usd']].copy()
-            df_precios_usd.columns = ['Día', 'Precio Chicago', 'Precio FOB Oficial', 'Precio FAS Local']
+            st.markdown("**📈 Precios en Dólares (USD/tn) - Spot vs Futuros**")
+            df_precios_usd = df_sim[['dia', 'precio_fas_usd', 'precio_futuro_usd', 'precio_chicago_usd']].copy()
+            df_precios_usd.columns = ['Día', 'Precio Spot FAS', 'Precio Futuro Cosecha', 'Precio Chicago (Ref)']
             st.line_chart(df_precios_usd.set_index('Día'))
             
-        # Gráfica de Rendimiento Estimado (tn/ha) y Logística
+        # Gráfica de Rendimiento Estimado (tn/ha) y Lluvia
         with col_res2:
-            st.markdown("**🌾 Rendimiento Estimado y Lluvia acumulada**")
+            st.markdown("**🌾 Rendimiento Estimado (Endógeno) y Lluvia**")
             df_agro = df_sim[['dia', 'rendimiento_estimado_tn_ha', 'lluvia_mm']].copy()
-            df_agro.columns = ['Día', 'Rendimiento (tn/ha)', 'Lluvia (mm)']
+            df_agro.columns = ['Día', 'Rendimiento (tn/ha)', 'Lluvia Semanal (mm)']
             st.line_chart(df_agro.set_index('Día'))
             
-        # Gráfica adicional de Camiones
-        st.markdown("**🚛 Volumen Logístico en Puerto (Toneladas/Día)**")
-        df_logistica = df_sim[['dia', 'descargas_camiones_tn']].copy()
-        df_logistica.columns = ['Día', 'Descarga de Camiones (tn)']
+        # Gráfica de Camiones Diarios
+        st.markdown("**🚛 Flujo Logístico Diario en Puerto (Camiones/Día - Endógeno)**")
+        df_logistica = df_sim[['dia', 'descargas_camiones']].copy()
+        df_logistica.columns = ['Día', 'Camiones Diarios']
         st.line_chart(df_logistica.set_index('Día'))
             
         # 5. Mostrar Log de Reglas del Motor
