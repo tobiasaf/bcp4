@@ -54,7 +54,7 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
         n_iter=8, # 8 combinaciones — suficiente para dataset pequeño (~300 filas), reduce overfitting en búsqueda
         cv=tscv,
         scoring='neg_mean_absolute_error',
-        n_jobs=-1, # Usa todos los cores de CPU
+        n_jobs=1, # Evita consumo excesivo de RAM en Streamlit Cloud
         random_state=42
     )
     
@@ -92,7 +92,7 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
     
     # Feature Importances: HGBR no tiene feature_importances_ directo
     # Calculamos la importancia por permutación (más preciso matemáticamente)
-    result = permutation_importance(modelo, X_train, y_train, n_repeats=5, random_state=42, n_jobs=-1)
+    result = permutation_importance(modelo, X_train, y_train, n_repeats=5, random_state=42, n_jobs=1)
     
     importancias = pd.DataFrame({
         'feature': variables_predictoras,

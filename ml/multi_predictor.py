@@ -1713,7 +1713,7 @@ def entrenar_y_predecir_todo(
         y_h1_train_fob = df_proc_full_train['fob_premium'].shift(-1).ffill()
         valid_idx_fob = y_h1_train_fob.dropna().index
         
-        res_fob = permutation_importance(hgbr_models_fob[1], X_h1_train_fob.loc[valid_idx_fob], y_h1_train_fob.loc[valid_idx_fob], n_repeats=3, random_state=42, n_jobs=-1)
+        res_fob = permutation_importance(hgbr_models_fob[1], X_h1_train_fob.loc[valid_idx_fob], y_h1_train_fob.loc[valid_idx_fob], n_repeats=3, random_state=42, n_jobs=1)
         importancias_fob = pd.DataFrame({
             'feature': features_h1,
             'importancia': res_fob.importances_mean
@@ -1737,7 +1737,7 @@ def entrenar_y_predecir_todo(
         y_h1_train_fas = df_proc_full_train['fas_discount'].shift(-1).ffill()
         valid_idx_fas = y_h1_train_fas.dropna().index
         
-        res_fas = permutation_importance(hgbr_models_fas[1], X_h1_train_fob.loc[valid_idx_fas], y_h1_train_fas.loc[valid_idx_fas], n_repeats=3, random_state=42, n_jobs=-1)
+        res_fas = permutation_importance(hgbr_models_fas[1], X_h1_train_fob.loc[valid_idx_fas], y_h1_train_fas.loc[valid_idx_fas], n_repeats=3, random_state=42, n_jobs=1)
         importancias_fas = pd.DataFrame({
             'feature': features_h1,
             'importancia': res_fas.importances_mean
