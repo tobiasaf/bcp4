@@ -1,5 +1,14 @@
-streamlit
-pandas
 numpy
+pandas
+scikit-learn
+xgboost
+streamlit
 plotly
+openpyxl
 scipy
+statsmodels
+arch
+yfinance>=0.2.31
+pytrends>=4.9.0
+cot-reports>=0.1.3
+beautifulsoup4>=4.12.0
