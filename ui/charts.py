@@ -3,12 +3,12 @@ import plotly.express as px
 import pandas as pd
 import streamlit as st
 
-# Colores institucionales / dashboard (Dark Fintech Premium)
-COLOR_PRIMARY = "#2962FF" # Azul Eléctrico
-COLOR_SECONDARY = "#00E676" # Esmeralda
-COLOR_DANGER = "#FF3D00" # Coral
-COLOR_WARNING = "#F9A826" # Amarillo
-COLOR_BG = "rgba(0,0,0,0)" # Fondo Transparente
+
+COLOR_PRIMARY = "#2962FF" 
+COLOR_SECONDARY = "#00E676" 
+COLOR_DANGER = "#FF3D00" 
+COLOR_WARNING = "#F9A826" 
+COLOR_BG = "rgba(0,0,0,0)" 
 
 def apply_transparent_layout(fig):
     """Layout claro/transparente por defecto (para productores)."""
@@ -29,9 +29,9 @@ def apply_bloomberg_layout(fig):
         font=dict(family="'Roboto Mono', monospace", size=11, color="#FF9900"),
         xaxis=dict(
             showgrid=True, 
-            gridcolor="#112211", # Grilla verde muy oscura
+            gridcolor="#112211", 
             linecolor="#333333", 
-            tickfont=dict(color="#00FF00") # Ticks en verde neón
+            tickfont=dict(color="#00FF00") 
         ),
         yaxis=dict(
             showgrid=True, 
@@ -40,7 +40,7 @@ def apply_bloomberg_layout(fig):
             tickfont=dict(color="#00FF00")
         ),
         legend=dict(
-            font=dict(color="#00FFFF", size=10), # Leyendas en cian
+            font=dict(color="#00FFFF", size=10), 
             bgcolor="rgba(0,0,0,0.8)",
             bordercolor="#333333",
             borderwidth=1
@@ -65,7 +65,7 @@ def plot_time_series(df: pd.DataFrame, x_col: str, y_cols: list, title: str):
     for i, col in enumerate(y_cols):
         if is_eco:
             color = COLORS_BLOOMBERG[i % len(COLORS_BLOOMBERG)]
-            width = 1.2 # Líneas más delgadas estilo terminal
+            width = 1.2 
         else:
             color = None
             width = 2
@@ -93,9 +93,9 @@ def plot_montecarlo(df_percentiles: pd.DataFrame, title: str, ylabel: str):
     dias = df_percentiles.index
     is_eco = st.session_state.get('es_economista', False)
     
-    # Configurar colores según contexto
+    
     if is_eco:
-        color_band_90 = 'rgba(0, 255, 0, 0.08)' # Verde translúcido tenue
+        color_band_90 = 'rgba(0, 255, 0, 0.08)' 
         color_band_50 = 'rgba(0, 255, 0, 0.2)'
         color_median = '#00FF00'
         width_median = 2
@@ -105,7 +105,7 @@ def plot_montecarlo(df_percentiles: pd.DataFrame, title: str, ylabel: str):
         color_median = COLOR_PRIMARY
         width_median = 3
         
-    # Banda 5% - 95%
+    
     fig.add_trace(go.Scatter(
         x=dias.tolist() + dias.tolist()[::-1],
         y=df_percentiles['p95'].tolist() + df_percentiles['p5'].tolist()[::-1],
@@ -117,7 +117,7 @@ def plot_montecarlo(df_percentiles: pd.DataFrame, title: str, ylabel: str):
         name='Banda 90% Confianza'
     ))
     
-    # Banda 25% - 75%
+    
     fig.add_trace(go.Scatter(
         x=dias.tolist() + dias.tolist()[::-1],
         y=df_percentiles['p75'].tolist() + df_percentiles['p25'].tolist()[::-1],
@@ -129,7 +129,7 @@ def plot_montecarlo(df_percentiles: pd.DataFrame, title: str, ylabel: str):
         name='Banda 50% Confianza'
     ))
     
-    # Escenario Central (Mediana)
+    
     fig.add_trace(go.Scatter(
         x=dias,
         y=df_percentiles['p50'],
@@ -151,7 +151,7 @@ def plot_tornado(df_importances: pd.DataFrame, title: str = "Importancia de Vari
     """Grafica un Tornado Chart de importancias."""
     is_eco = st.session_state.get('es_economista', False)
     
-    # Escala de color estilo terminal o corporativa
+    
     scale = [[0, '#001100'], [1, '#00FF00']] if is_eco else 'Blues'
     
     fig = px.bar(
@@ -176,11 +176,11 @@ def plot_backtest_single(df_comp: pd.DataFrame, title: str, ylabel: str, fecha_p
     
     is_eco = st.session_state.get('es_economista', False)
     
-    # Colores estilo consola Bloomberg
-    color_real = "#FF9900" if is_eco else COLOR_PRIMARY   # Ámbar
-    color_pred = "#00FF00" if is_eco else COLOR_WARNING   # Verde neón
     
-    # Shaded confidence band (dibujada primero para quedar al fondo)
+    color_real = "#FF9900" if is_eco else COLOR_PRIMARY   
+    color_pred = "#00FF00" if is_eco else COLOR_WARNING   
+    
+    
     if 'lower' in df_comp.columns and 'upper' in df_comp.columns:
         color_band = 'rgba(0, 255, 255, 0.12)' if is_eco else 'rgba(41, 98, 255, 0.12)'
         df_clean = df_comp.dropna(subset=['lower', 'upper']).copy()
@@ -212,7 +212,7 @@ def plot_backtest_single(df_comp: pd.DataFrame, title: str, ylabel: str, fecha_p
         line=dict(color=color_pred, width=1.2 if is_eco else 2, dash='dash')
     ))
     
-    # Modelos individuales (si existen en el DataFrame y están solicitados/permitidos)
+    
     modelos_map = {
         'pred_vecm': ('VECM', '#00FFFF' if is_eco else '#0288D1'),
         'pred_ms': ('Markov Switching', '#FF33FF' if is_eco else '#7B1FA2'),
@@ -249,18 +249,18 @@ def plot_backtest_single(df_comp: pd.DataFrame, title: str, ylabel: str, fecha_p
                 line=dict(color=color, width=1.0 if is_eco else 1.5, dash='dot')
             ))
     
-    # Agregar línea vertical que marca el inicio de la proyección a ciegas
+    
     if fecha_proyeccion:
         fig.add_vline(
             x=pd.to_datetime(fecha_proyeccion),
             line_width=1.5,
             line_dash="dashdot",
-            line_color="#E040FB" if not is_eco else "#00FFFF",  # Magenta neón o Cian neón
+            line_color="#E040FB" if not is_eco else "#00FFFF",  
         )
         fig.add_annotation(
             x=pd.to_datetime(fecha_proyeccion),
             y=1.0,
-            yref="paper",  # Posicionamiento respecto al tope del gráfico
+            yref="paper",  
             text=" Proyección a ciegas",
             showarrow=False,
             xanchor="left",
@@ -286,11 +286,11 @@ def plot_backtest_with_overlays(df: pd.DataFrame, target: str, overlay_cols: lis
     
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     
-    # Colores estilo consola Bloomberg
-    color_real = "#FF9900" if is_eco else COLOR_PRIMARY   # Ámbar o Azul
-    color_pred = "#00FF00" if is_eco else COLOR_SECONDARY # Verde neón o Esmeralda
     
-    # Eje principal: Real
+    color_real = "#FF9900" if is_eco else COLOR_PRIMARY   
+    color_pred = "#00FF00" if is_eco else COLOR_SECONDARY 
+    
+    
     fig.add_trace(
         go.Scatter(
             x=df['fecha'], 
@@ -302,7 +302,7 @@ def plot_backtest_with_overlays(df: pd.DataFrame, target: str, overlay_cols: lis
         secondary_y=False
     )
     
-    # Eje principal: Predicción
+    
     fig.add_trace(
         go.Scatter(
             x=df['fecha'], 
@@ -314,7 +314,7 @@ def plot_backtest_with_overlays(df: pd.DataFrame, target: str, overlay_cols: lis
         secondary_y=False
     )
     
-    # Colores contrastantes para variables superpuestas
+    
     COLORS_OVERLAY = ["#00FFFF", "#FF33FF", "#FFFF00", "#FFFFFF"] if is_eco else ["#FF3D00", "#F9A826", "#9C27B0", "#607D8B"]
     
     for i, col in enumerate(overlay_cols):
@@ -347,7 +347,7 @@ def plot_backtest_with_overlays(df: pd.DataFrame, target: str, overlay_cols: lis
         )
     )
     
-    # Títulos de ejes
+    
     fig.update_yaxes(title_text="Eje Principal (Valor)", secondary_y=False)
     if overlay_cols:
         fig.update_yaxes(title_text="Eje Secundario (Predictoras)", secondary_y=True)
@@ -361,14 +361,14 @@ def plot_local_attribution(df_contrib: pd.DataFrame, title: str):
     """
     is_eco = st.session_state.get('es_economista', False)
     
-    # Clonar para evitar modificar el original
+    
     df_plot = df_contrib.copy()
     
-    # Calcular contribución absoluta para ordenar
-    df_plot['abs_contribucion'] = df_plot['contribucion'].abs()
-    df_plot = df_plot.sort_values('abs_contribucion', ascending=True) # Ascendente para que la barra más larga quede arriba
     
-    # Asignar colores según el signo de la contribución
+    df_plot['abs_contribucion'] = df_plot['contribucion'].abs()
+    df_plot = df_plot.sort_values('abs_contribucion', ascending=True) 
+    
+    
     colors = [
         '#00FF00' if c >= 0 else '#FF3333' 
         for c in df_plot['contribucion']
@@ -398,7 +398,7 @@ def plot_local_attribution(df_contrib: pd.DataFrame, title: str):
         showlegend=False
     )
     
-    # Dibujar una línea vertical en x=0 para referencia
+    
     fig.add_vline(x=0.0, line_width=1, line_dash="dash", line_color="#555555" if is_eco else "#888888")
     
     return apply_layout_bcp(fig)
@@ -411,8 +411,8 @@ def plot_garch_volatility(df_vol: pd.DataFrame, title: str):
     fig = go.Figure()
     is_eco = st.session_state.get('es_economista', False)
     
-    color_fob = "#00FFFF" if is_eco else "#0288D1"  # Cian o Azul
-    color_fas = "#FF33FF" if is_eco else "#7B1FA2"  # Magenta o Púrpura
+    color_fob = "#00FFFF" if is_eco else "#0288D1"  
+    color_fas = "#FF33FF" if is_eco else "#7B1FA2"  
     
     if 'vol_fob' in df_vol.columns:
         fig.add_trace(go.Scatter(

@@ -14,14 +14,14 @@ class LocalFoundationPredictor:
         self.seasonal_periods = seasonal_periods
 
     def predict(self, history: np.ndarray, steps: int) -> np.ndarray:
-        # Prevent fitting errors with very short history
+        
         if len(history) < 2 * self.seasonal_periods:
             period = max(4, len(history) // 4)
         else:
             period = self.seasonal_periods
             
         try:
-            # Try Holt-Winters with additive trend and additive seasonality
+            
             model = ExponentialSmoothing(
                 history, 
                 trend='add', 
@@ -36,7 +36,7 @@ class LocalFoundationPredictor:
             return np.array(fc, dtype=float)
         except Exception:
             try:
-                # Fallback to simple Holt Linear Trend (no seasonality)
+                
                 model = ExponentialSmoothing(history, trend='add', damped_trend=True)
                 fit = model.fit()
                 fc = fit.forecast(steps)
@@ -44,7 +44,7 @@ class LocalFoundationPredictor:
                     raise ValueError("NaNs in Holt forecast")
                 return np.array(fc, dtype=float)
             except Exception:
-                # Ultimate fallback: smooth exponential decay back to historical mean
+                
                 mean_val = np.mean(history)
                 last_val = history[-1]
                 t = np.arange(1, steps + 1)
@@ -74,7 +74,7 @@ class LLMFoundationPredictor:
             
         genai.configure(api_key=api_key)
         
-        # Select best flash model available
+        
         try:
             model = genai.GenerativeModel('gemini-2.5-flash')
         except Exception:
@@ -83,7 +83,7 @@ class LLMFoundationPredictor:
             except Exception:
                 model = genai.GenerativeModel('gemini-2.0-flash')
 
-        # Limit history to prevent huge token usage, last 104 weeks (2 years) is ample for zero-shot forecasting
+        
         history_subset = list(history[-104:])
         history_str = ", ".join([f"{v:.2f}" for v in history_subset])
         
@@ -110,7 +110,7 @@ class LLMFoundationPredictor:
         response = model.generate_content(prompt)
         text = response.text.strip()
         
-        # Clean up any potential markdown formatting from LLM response
+        
         if text.startswith("```"):
             text = text.split("\n", 1)[1]
         if text.endswith("```"):
@@ -139,18 +139,18 @@ class FoundationTimeSeriesPredictor:
 
     def predict(self, history: np.ndarray, steps: int, target_name: str = "precio_trigo") -> np.ndarray:
         try:
-            # Try zero-shot LLM forecasting
+            
             fc = self.llm_predictor.predict(history, steps, target_name)
-            # Sanity checks on the predictions
+            
             if np.any(np.isnan(fc)) or np.any(np.isinf(fc)):
                 raise ValueError("NaNs in LLM forecast")
-            # Bound check: prevent extreme LLM predictions
+            
             hist_min = np.min(history)
             hist_max = np.max(history)
-            # Allow some extrapolation but clip crazy values
+            
             fc = np.clip(fc, hist_min * 0.5, hist_max * 1.5)
             return fc
         except Exception as e:
-            # Fallback to local high-fidelity Holt-Winters model
-            # print(f"[FOUNDATION] Fallback active due to: {e}")
+            
+            
             return self.local_predictor.predict(history, steps)

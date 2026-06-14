@@ -18,24 +18,24 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
     y = df[variable_objetivo]
     
     if fecha_corte and 'fecha' in df.columns:
-        # Split basado en fecha
+        
         mask_train = df['fecha'] < pd.to_datetime(fecha_corte)
         split_idx = mask_train.sum()
         if split_idx == 0 or split_idx == len(df):
-            # Fallback si la fecha de corte no divide el dataset
+            
              split_idx = int(len(df) * 0.8)
     else:
-        # Time-based split por defecto: 80% train, 20% test
+        
         split_idx = int(len(df) * 0.8)
         
     X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
     y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
     fechas_test = df['fecha'].iloc[split_idx:] if 'fecha' in df.columns else np.arange(len(y_test))
     
-    # Definir el modelo base (Nativo de Scikit-Learn, motor tipo LightGBM/XGBoost)
+    
     hgbr_model = HistGradientBoostingRegressor(random_state=42)
     
-    # Espacio de hiperparámetros amplio
+    
     param_distributions = {
         'max_iter': [50, 100, 200],
         'max_depth': [3, 5, 7],
@@ -44,21 +44,21 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
         'min_samples_leaf': [5, 10, 20]
     }
     
-    # Validación Cruzada para Series de Tiempo (evita leakage hacia el pasado)
+    
     tscv = TimeSeriesSplit(n_splits=5)
     
-    # Búsqueda de hiperparámetros (más iteraciones = más poder de cómputo y mejor modelo)
+    
     search = RandomizedSearchCV(
         estimator=hgbr_model,
         param_distributions=param_distributions,
-        n_iter=8, # 8 combinaciones — suficiente para dataset pequeño (~300 filas), reduce overfitting en búsqueda
+        n_iter=8, 
         cv=tscv,
         scoring='neg_mean_absolute_error',
-        n_jobs=1, # Evita consumo excesivo de RAM en Streamlit Cloud
+        n_jobs=1, 
         random_state=42
     )
     
-    # Ajuste exhaustivo
+    
     if predecir_diferencias:
         y_train_diff = y_train.diff().dropna()
         X_train_diff = X_train.loc[y_train_diff.index]
@@ -68,13 +68,13 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
         
     modelo = search.best_estimator_
     
-    # Predicciones
+    
     if predecir_diferencias:
-        # Predecir diferencias
+        
         y_pred_train_diff = modelo.predict(X_train.iloc[1:])
         y_pred_test_diff = modelo.predict(X_test)
         
-        # Reconstruir niveles
+        
         y_prev_train = y_train.iloc[:-1].values
         y_pred_train_rec = y_prev_train + y_pred_train_diff
         y_pred_train = np.insert(y_pred_train_rec, 0, y_train.iloc[0])
@@ -85,13 +85,13 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
         y_pred_train = modelo.predict(X_train)
         y_pred_test = modelo.predict(X_test)
     
-    # Métricas en test
+    
     r2 = r2_score(y_test, y_pred_test)
     mae = mean_absolute_error(y_test, y_pred_test)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
     
-    # Feature Importances: HGBR no tiene feature_importances_ directo
-    # Calculamos la importancia por permutación (más preciso matemáticamente) solo si se requiere
+    
+    
     if calcular_importancia:
         result = permutation_importance(modelo, X_train, y_train, n_repeats=5, random_state=42, n_jobs=1)
         importancias = pd.DataFrame({
@@ -99,7 +99,7 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
             'importancia': result.importances_mean
         }).sort_values('importancia', ascending=False)
         
-        # Normalizar para que sume 1 (o cerca) y los gráficos se vean consistentes
+        
         total_imp = importancias['importancia'].sum()
         if total_imp > 0:
             importancias['importancia'] = importancias['importancia'] / total_imp
@@ -111,7 +111,7 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
             'importancia': 1.0 / len(variables_predictoras)
         })
     
-    # Guardar resultados para backtesting visual
+    
     df_backtest = pd.DataFrame({
         'fecha': fechas_test,
         'real': y_test,
@@ -136,9 +136,9 @@ def detectar_lag_optimo(df: pd.DataFrame, col_evento: str, col_objetivo: str, ma
     """
     correlaciones = []
     
-    # Cross-correlation manual usando pandas shift
+    
     for lag in range(0, max_lag + 1):
-        # Shift la variable evento hacia adelante (es decir, el evento en T-lag predice el objetivo en T)
+        
         serie_evento_lag = df[col_evento].shift(lag)
         corr = df[col_objetivo].corr(serie_evento_lag)
         if pd.notna(corr):
@@ -147,7 +147,7 @@ def detectar_lag_optimo(df: pd.DataFrame, col_evento: str, col_objetivo: str, ma
     if not correlaciones:
         return 0, 0.0
         
-    # Encontrar el lag con mayor correlación absoluta
+    
     mejor_lag, mejor_corr = max(correlaciones, key=lambda x: abs(x[1]))
     
     return mejor_lag, mejor_corr

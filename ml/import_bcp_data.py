@@ -32,14 +32,14 @@ def inyectar_datos_historicos_f6(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
     
-    # 1. Tipo de cambio financiero y brechas
+    
     df['precio_blue_usd'] = df['tipo_cambio'] * (1 + df['brecha_cambiaria_pct'] / 100.0)
     df['precio_mep_usd'] = df['precio_blue_usd'] * 0.96
     df['precio_ccl_usd'] = df['precio_blue_usd'] * 1.02
     df['brecha_blue_pct'] = df['brecha_cambiaria_pct']
     df['brecha_ccl_pct'] = ((df['precio_ccl_usd'] - df['tipo_cambio']) / df['tipo_cambio']) * 100.0
     
-    # 2. Riesgo País (EMBI) con tendencia y ruido determinístico
+    
     rng = np.random.default_rng(42)
     riesgos = []
     for idx, row in df.iterrows():
@@ -56,7 +56,7 @@ def inyectar_datos_historicos_f6(df: pd.DataFrame) -> pd.DataFrame:
         riesgos.append(b)
     df['riesgo_pais_embi'] = riesgos
     
-    # 3. Tasa de Política Monetaria
+    
     tasas = []
     for idx, row in df.iterrows():
         f = pd.to_datetime(row['fecha'])
@@ -71,17 +71,17 @@ def inyectar_datos_historicos_f6(df: pd.DataFrame) -> pd.DataFrame:
         tasas.append(t)
     df['tasa_politica_pct'] = tasas
     
-    # 4. Commodities Globales
+    
     df['dxy_index'] = 101.5 + rng.normal(0, 1.5, len(df))
     df['petroleo_wti_usd'] = 75.0 + rng.normal(0, 5.0, len(df))
     df['cbot_maiz_usd'] = df['precio_chicago_usd'] * 0.72 + rng.normal(0, 5.0, len(df))
     df['cbot_soja_usd'] = df['precio_chicago_usd'] * 1.85 + rng.normal(0, 15.0, len(df))
     
-    # 5. COT Positions wheat
+    
     df['cot_managed_money_net'] = -20000.0 + rng.normal(0, 15000.0, len(df))
     df['cot_commercial_net'] = 12000.0 + rng.normal(0, 8000.0, len(df))
     
-    # 6. Altura del Río Paraná
+    
     rio = []
     for idx, row in df.iterrows():
         anom = row.get('anomalia_logistica_parana', 0)
@@ -89,15 +89,15 @@ def inyectar_datos_historicos_f6(df: pd.DataFrame) -> pd.DataFrame:
         rio.append(base + rng.normal(0, 0.4))
     df['nivel_parana_m'] = rio
     
-    # 7. USDA WASDE
+    
     df['wasde_stocks_to_use'] = 0.32 + rng.normal(0, 0.015, len(df))
     df['wasde_arg_export_mt'] = 11500.0 + rng.normal(0, 1000.0, len(df))
     
-    # 8. Google Trends
+    
     df['gtrends_vender_trigo'] = (50.0 + rng.normal(0, 10.0, len(df))).clip(0, 100)
     df['gtrends_dolar'] = (50.0 + rng.normal(0, 15.0, len(df))).clip(0, 100)
     
-    # 9. ENSO anomalía
+    
     df['nino34_anomalia'] = 0.0
     for idx, row in df.iterrows():
         enso = str(row.get('fase_enso', 'NEUTRAL')).upper()
@@ -134,7 +134,7 @@ def inyectar_brecha_historica(df: pd.DataFrame) -> pd.DataFrame:
             b = 32.0
         else:
             b = 30.0
-        # Agregar pequeña fluctuación determinística menor
+        
         rng = np.random.default_rng(idx)
         b = max(0.0, b + rng.normal(0, 1.5))
         brechas.append(b)
@@ -142,29 +142,29 @@ def inyectar_brecha_historica(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def ingest_bcp_data(modo_live=False):
-    # Si estamos en modo live, actualizamos en vivo y salimos
+    
     if modo_live:
-        print("📡 [Modo Live] Iniciando actualización con datos de mercado en tiempo real...")
+        print(" [Modo Live] Iniciando actualización con datos de mercado en tiempo real...")
         hist_file = 'data/real/historico_trigo_real.csv'
         if not os.path.exists(hist_file):
             print("  [Warning] No se encontró el histórico real. Corriendo ingesta base primero...")
             ingest_bcp_data(modo_live=False)
         
-        # Cargar el histórico existente
+        
         df_weekly = pd.read_csv(hist_file)
         df_weekly['fecha'] = pd.to_datetime(df_weekly['fecha'])
         
-        # Obtener datos frescos de las APIs
+        
         live_data, api_status = fetch_all_live(timeout=5)
         
-        # Obtener la fecha del domingo de la semana actual (W-SUN)
+        
         today = pd.to_datetime(datetime.now().date())
         domingo_actual = today + timedelta(days=(6 - today.weekday()))
-        # Reindexar el DataFrame para llenar cualquier brecha de semanas intermedias (W-SUN)
-        # hasta la semana actual (domingo_actual)
+        
+        
         fechas_rango = pd.date_range(start=df_weekly['fecha'].min(), end=domingo_actual, freq='W-SUN')
         
-        # Guardar si ya existía la fila para la semana actual
+        
         ya_existe_semana = len(df_weekly) > 0 and df_weekly.iloc[-1]['fecha'].date() == domingo_actual.date()
         
         df_weekly = df_weekly.set_index('fecha').reindex(fechas_rango)
@@ -184,9 +184,9 @@ def ingest_bcp_data(modo_live=False):
                     df_weekly.loc[last_idx, col] = str(val)
                 else:
                     df_weekly.loc[last_idx, col] = float(val)
-        # Guardar actualización
+        
         df_weekly.to_csv(hist_file, index=False)
-        print(f"📡 [Modo Live] ¡Actualización finalizada con éxito! Dataset guardado con {len(df_weekly)} semanas.")
+        print(f" [Modo Live] ¡Actualización finalizada con éxito! Dataset guardado con {len(df_weekly)} semanas.")
         return df_weekly, api_status
     print("Iniciando ingesta y consolidación de datos reales de BCP Estudios Económicos...")
     file_path = 'data/Datos_Estudios_Economicos.xlsx'
@@ -196,7 +196,7 @@ def ingest_bcp_data(modo_live=False):
         
     xls = pd.ExcelFile(file_path)
     
-    # 1. Chicago Daily
+    
     print("- Procesando Cotización Chicago...")
     df_chicago = pd.read_excel(xls, sheet_name='Cotización Chicago', header=None)
     df_chicago.columns = ['fecha', 'precio_chicago_usd']
@@ -204,7 +204,7 @@ def ingest_bcp_data(modo_live=False):
     df_chicago['precio_chicago_usd'] = pd.to_numeric(df_chicago['precio_chicago_usd'], errors='coerce')
     df_chicago = df_chicago.dropna(subset=['fecha']).drop_duplicates(subset=['fecha'])
     
-    # 2. FOB Daily
+    
     print("- Procesando Precio FOB...")
     df_fob = pd.read_excel(xls, sheet_name='Precio FOB', header=None)
     df_fob.columns = ['fecha', 'precio_fob_usd']
@@ -212,7 +212,7 @@ def ingest_bcp_data(modo_live=False):
     df_fob['precio_fob_usd'] = pd.to_numeric(df_fob['precio_fob_usd'], errors='coerce')
     df_fob = df_fob.dropna(subset=['fecha']).drop_duplicates(subset=['fecha'])
     
-    # 3. FAS Daily
+    
     print("- Procesando Precio FAS...")
     df_fas = pd.read_excel(xls, sheet_name='Precio FAS')
     df_fas = df_fas.rename(columns={'Fecha': 'fecha', 'Valor $': 'precio_fas_ars', 'Cotización U$S': 'tipo_cambio_fas', 'Valor U$D': 'precio_fas_usd'})
@@ -222,16 +222,16 @@ def ingest_bcp_data(modo_live=False):
     df_fas['tipo_cambio_fas'] = pd.to_numeric(df_fas['tipo_cambio_fas'], errors='coerce')
     df_fas = df_fas.dropna(subset=['fecha']).drop_duplicates(subset=['fecha'])
     
-    # 4. Pizarra Daily
+    
     print("- Procesando Precio pizarra...")
     df_pizarra = pd.read_excel(xls, sheet_name='Precio pizarra')
-    df_pizarra = df_pizarra.iloc[:, [0, 1]] # Keep Fecha and U$S
+    df_pizarra = df_pizarra.iloc[:, [0, 1]] 
     df_pizarra.columns = ['fecha', 'precio_pizarra_usd']
     df_pizarra['fecha'] = pd.to_datetime(df_pizarra['fecha'], dayfirst=True, errors='coerce')
     df_pizarra['precio_pizarra_usd'] = pd.to_numeric(df_pizarra['precio_pizarra_usd'], errors='coerce')
     df_pizarra = df_pizarra.dropna(subset=['fecha']).drop_duplicates(subset=['fecha'])
     
-    # 5. Tipo de Cambio Daily
+    
     print("- Procesando Tipo de cambio...")
     df_tc = pd.read_excel(xls, sheet_name='Tipo de cambio ')
     df_tc.columns = ['fecha', 'tipo_cambio']
@@ -239,7 +239,7 @@ def ingest_bcp_data(modo_live=False):
     df_tc['tipo_cambio'] = pd.to_numeric(df_tc['tipo_cambio'], errors='coerce')
     df_tc = df_tc.dropna(subset=['fecha']).drop_duplicates(subset=['fecha'])
     
-    # 6. Crear Calendario Base Diario
+    
     print("- Generando calendario base daily...")
     min_date = pd.to_datetime('2019-01-01')
     max_date = max(df_chicago['fecha'].max(), df_fas['fecha'].max(), df_tc['fecha'].max())
@@ -247,27 +247,27 @@ def ingest_bcp_data(modo_live=False):
     all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
     df_merged = pd.DataFrame({'fecha': all_dates})
     
-    # Merge Daily data
+    
     df_merged = df_merged.merge(df_chicago, on='fecha', how='left')
     df_merged = df_merged.merge(df_fob, on='fecha', how='left')
     df_merged = df_merged.merge(df_fas, on='fecha', how='left')
     df_merged = df_merged.merge(df_pizarra, on='fecha', how='left')
     df_merged = df_merged.merge(df_tc, on='fecha', how='left')
     
-    # Rellenar precios diarios y tipo de cambio (forward fill para fines de semana / feriados)
+    
     fill_cols = ['precio_chicago_usd', 'precio_fob_usd', 'precio_fas_ars', 'precio_fas_usd', 'tipo_cambio_fas', 'precio_pizarra_usd', 'tipo_cambio']
     df_merged[fill_cols] = df_merged[fill_cols].ffill().bfill()
     
-    # Completar columnas de precios finales
+    
     df_merged['precio_bb_ars'] = df_merged['precio_fas_ars']
-    # En caso de que falte tipo de cambio primario, usar tipo_cambio_fas
+    
     df_merged['tipo_cambio'] = df_merged['tipo_cambio'].fillna(df_merged['tipo_cambio_fas'])
     
-    # Recalcular precio_fas_usd de forma dinámica usando precios en ARS y tipo de cambio reales
-    # Esto soluciona de raíz el flatline de fines de 2025 provocado por los NaNs manuales en la planilla original.
+    
+    
     df_merged['precio_fas_usd'] = df_merged['precio_fas_ars'] / df_merged['tipo_cambio']
     
-    # 7. Descargas (desde 2021) Monthly
+    
     print("- Procesando Descargas mensuales...")
     df_descargas = pd.read_excel(xls, sheet_name='Descargas (desde 2021)')
     
@@ -296,7 +296,7 @@ def ingest_bcp_data(modo_live=False):
             })
     df_desc_monthly = pd.DataFrame(descargas_records)
     
-    # 8. Embarques (desde 2021) Monthly
+    
     print("- Procesando Embarques mensuales...")
     df_embarques = pd.read_excel(xls, sheet_name='Embarques (desde 2021)')
     
@@ -318,38 +318,38 @@ def ingest_bcp_data(modo_live=False):
                 })
     df_emb_monthly = pd.DataFrame(embarques_records)
     
-    # Combinar logística mensual
+    
     df_log_monthly = df_desc_monthly.merge(df_emb_monthly, on=['year', 'month'], how='outer')
     
-    # Promedios mensuales históricos para completar 2019-2020
+    
     df_log_avg = df_log_monthly.groupby('month').mean(numeric_only=True).reset_index().drop(columns=['year'], errors='ignore')
     
-    # Distribución diaria
+    
     print("- Distribuyendo volúmenes mensuales a diarios...")
     df_merged['year'] = df_merged['fecha'].dt.year
     df_merged['month'] = df_merged['fecha'].dt.month
     df_merged['day'] = df_merged['fecha'].dt.day
     
-    # Obtener el número de días en cada mes
+    
     df_merged['days_in_month'] = df_merged['fecha'].dt.days_in_month
     
-    # Merge de los datos logísticos mensuales reales
+    
     df_merged = df_merged.merge(df_log_monthly, on=['year', 'month'], how='left')
     
-    # Para los meses de 2019-2020 donde no hay datos logísticos, rellenar con el promedio del mes histórico
+    
     for col in ['descargas_camiones_cant_mensual', 'descargas_camiones_tn_mensual', 'descargas_vagones_cant_mensual', 'descargas_vagones_tn_mensual', 'embarques_tn_mensual']:
-        # Mapear el promedio del mes
+        
         avg_series = df_merged['month'].map(df_log_avg.set_index('month')[col])
         df_merged[col] = df_merged[col].fillna(avg_series)
         
-    # Calcular tasas diarias
+    
     df_merged['descargas_camiones'] = df_merged['descargas_camiones_cant_mensual'] / df_merged['days_in_month']
     df_merged['descargas_camiones_tn'] = df_merged['descargas_camiones_tn_mensual'] / df_merged['days_in_month']
     df_merged['descargas_vagones'] = df_merged['descargas_vagones_cant_mensual'] / df_merged['days_in_month']
     df_merged['descargas_vagones_tn'] = df_merged['descargas_vagones_tn_mensual'] / df_merged['days_in_month']
     df_merged['embarques_tn'] = df_merged['embarques_tn_mensual'] / df_merged['days_in_month']
     
-    # 9. Procesar precipitaciones reales desde PPT.xlsx (eliminando Open-Meteo y sintéticos)
+    
     print("- Procesando precipitaciones reales consolidadas desde PPT.xlsx...")
     ppt_path = 'data/PPT.xlsx'
     if not os.path.exists(ppt_path):
@@ -420,19 +420,19 @@ def ingest_bcp_data(modo_live=False):
     df_all_ppt = pd.concat(all_ppt_dfs, ignore_index=True)
     df_monthly_rain = df_all_ppt.groupby(['year', 'month'])['rain'].mean().reset_index()
     
-    # Unir las lluvias mensuales reales
+    
     df_merged = df_merged.merge(df_monthly_rain, on=['year', 'month'], how='left')
-    # Rellenar cualquier 2026/01 faltante con el promedio general del mes de Enero
+    
     jan_avg = df_monthly_rain[df_monthly_rain['month'] == 1]['rain'].mean()
     df_merged['rain'] = df_merged['rain'].fillna(jan_avg)
     
-    # Calcular lluvia diaria distribuyéndola uniformemente en el mes para poder sumarla semanalmente
+    
     df_merged['lluvia_mm'] = df_merged['rain'] / df_merged['days_in_month']
     df_merged = df_merged.drop(columns=['rain'])
     
     print("  -> ¡Precipitaciones reales mensuales de las 19 localidades integradas correctamente!")
 
-    # 10. Procesar rendimiento y superficie reales desde rind y sup.xlsx
+    
     print("- Procesando rendimiento y superficie reales desde rind y sup.xlsx...")
     y_path = 'data/rind y sup.xlsx'
     if not os.path.exists(y_path):
@@ -455,12 +455,12 @@ def ingest_bcp_data(modo_live=False):
     campaign_data = {}
     for camp, cols in campaigns.items():
         sup = pd.to_numeric(total_row.iloc[cols['sup_col']], errors='coerce')
-        rinde = pd.to_numeric(total_row.iloc[cols['rinde_col']], errors='coerce') / 1000.0 # kg/ha -> tn/ha
+        rinde = pd.to_numeric(total_row.iloc[cols['rinde_col']], errors='coerce') / 1000.0 
         campaign_data[camp] = {'sup_cosechada_ha': sup, 'rinde_tn_ha': rinde}
         
     def get_campaign_info(row):
-        # Determinar campaña basada en el mes y año
-        # Campaña inicia con siembra en Junio (mes 6) y termina en Mayo del año siguiente
+        
+        
         dt = row.fecha
         yr = dt.year
         if dt.month >= 6:
@@ -474,9 +474,9 @@ def ingest_bcp_data(modo_live=False):
     df_merged[['rendimiento_estimado_tn_ha', 'superficie_cosechada_ha']] = df_merged.apply(get_campaign_info, axis=1)
     print("  -> ¡Rendimientos y superficies reales de trigo asignados correctamente como constantes por campaña!")
 
-    # 11. Determinar fase ENSO real e histórica
-    # Asignación ENSO trimestral basada en el índice ONI real de NOAA
-    # (más precisa que asignar por año completo)
+    
+    
+    
     _ENSO_TRIMESTRAL = {
         (2019, 1): 'Niño',  (2019, 2): 'Niño',  (2019, 3): 'Niño',
         (2019, 4): 'Niño',  (2019, 5): 'Neutral', (2019, 6): 'Neutral',
@@ -511,29 +511,29 @@ def ingest_bcp_data(modo_live=False):
         return _ENSO_TRIMESTRAL.get((row['year'], row['month']), 'Neutral')
     df_merged['fase_enso'] = df_merged.apply(assign_enso, axis=1)
     
-    # Calcular Basis = Precio BB USD - Chicago
+    
     df_merged['basis_usd'] = (df_merged['precio_bb_ars'] / df_merged['tipo_cambio']) - df_merged['precio_chicago_usd']
     
-    # Anomalía Paraná
+    
     df_merged['anomalia_logistica_parana'] = 0
     mask_bajante = (df_merged['fecha'] >= '2021-05-01') & (df_merged['fecha'] <= '2021-11-30')
     df_merged.loc[mask_bajante, 'anomalia_logistica_parana'] = 1
     
-    # Asignar temperatura como valor constante de 18.0°C (eliminando Open-Meteo)
+    
     df_merged['temp_media'] = 18.0
     
-    # Inyectar brecha cambiaria histórica
+    
     df_merged = inyectar_brecha_historica(df_merged)
     
-    # Consultar API en tiempo real de dolarapi.com
-    # En modo histórico/entrenamiento, inyectamos los proxies de Fase 6
+    
+    
     df_merged = inyectar_datos_historicos_f6(df_merged)
     
-    # 10b. Procesar Compras y Precios de Fertilizantes (Urea) reales
+    
     print("- Procesando compras y fertilizantes desde Datos Est Econ 2.xlsx...")
     file_path_2 = 'data/real/Datos Est Econ 2.xlsx'
     if os.path.exists(file_path_2):
-        # A. Parsear PRECIO UREA
+        
         df_urea = pd.read_excel(file_path_2, sheet_name='PRECIO UREA').iloc[1:].copy()
         df_urea['fecha'] = pd.to_datetime(df_urea['Dia'], errors='coerce')
         df_urea = df_urea.dropna(subset=['fecha'])
@@ -541,7 +541,7 @@ def ingest_bcp_data(modo_live=False):
         df_urea['precio_map_usd'] = pd.to_numeric(df_urea['MAP'], errors='coerce')
         df_urea_clean = df_urea[['fecha', 'precio_urea_usd', 'precio_map_usd']].sort_values('fecha').drop_duplicates(subset=['fecha'])
         
-        # B. Parsear COMPRAS
+        
         df_comp_raw = pd.read_excel(file_path_2, sheet_name='COMPRAS ')
         campaign_starts = {
             '2024/25': 0, '2023/24': 7, '2022/23': 15, '2021/22': 22,
@@ -586,7 +586,7 @@ def ingest_bcp_data(modo_live=False):
                          'delta_compras_se', 'delta_compras_si', 'delta_compras_totales']
             campaign_dfs.append(sub[keep_cols])
             
-        # Reindexar cada campaña a diario y ffill
+        
         min_date_val = df_merged['fecha'].min()
         max_date_val = df_merged['fecha'].max()
         daily_index_val = pd.date_range(start=min_date_val, end=max_date_val, freq='D')
@@ -610,14 +610,14 @@ def ingest_bcp_data(modo_live=False):
         df_daily_agg['compras_sin_precio_pct'] = df_daily_agg['compras_sin_precio_tot'] / df_daily_agg['compras_totales']
         df_daily_agg['compras_sin_precio_pct'] = df_daily_agg['compras_sin_precio_pct'].fillna(0.0)
         
-        # Reindexar urea a diario y ffill
+        
         df_urea_daily = df_urea_clean.set_index('fecha').reindex(daily_index_val).ffill().bfill().reset_index().rename(columns={'index': 'fecha'})
         
-        # Unir a df_merged
+        
         df_merged = df_merged.merge(df_daily_agg, on='fecha', how='left')
         df_merged = df_merged.merge(df_urea_daily, on='fecha', how='left')
         
-        # Rellenar nans por seguridad
+        
         fill_cols_new = ['compras_se', 'compras_si', 'compras_totales', 'compras_sin_precio_tot', 'compras_sin_precio_pct',
                          'delta_compras_se', 'delta_compras_si', 'delta_compras_totales', 'precio_urea_usd', 'precio_map_usd']
         df_merged[fill_cols_new] = df_merged[fill_cols_new].ffill().fillna(0.0)
@@ -625,7 +625,7 @@ def ingest_bcp_data(modo_live=False):
     else:
         print("  [Warning] No se encontró Datos Est Econ 2.xlsx para procesar compras y fertilizantes.")
 
-    # 10c. Ingestar NDVI Satelital y futuros de ROFEX (Phase 4)
+    
     print("- Ingestando NDVI Satelital y futuros de ROFEX...")
     ndvi_path = 'data/real/ndvi_satelital_bcp.csv'
     rofex_path = 'data/real/futuros_rofex_trigo.csv'
@@ -637,17 +637,17 @@ def ingest_bcp_data(modo_live=False):
         df_rofex_raw = pd.read_csv(rofex_path)
         df_rofex_raw['fecha'] = pd.to_datetime(df_rofex_raw['fecha'])
         
-        # Reindexar a diario y ffill/bfill
+        
         daily_index_val = pd.date_range(start=df_merged['fecha'].min(), end=df_merged['fecha'].max(), freq='D')
         
         df_ndvi_daily = df_ndvi_raw.set_index('fecha').reindex(daily_index_val).ffill().bfill().reset_index().rename(columns={'index': 'fecha'})
         df_rofex_daily = df_rofex_raw.set_index('fecha').reindex(daily_index_val).ffill().bfill().reset_index().rename(columns={'index': 'fecha'})
         
-        # Unir a df_merged
+        
         df_merged = df_merged.merge(df_ndvi_daily, on='fecha', how='left')
         df_merged = df_merged.merge(df_rofex_daily, on='fecha', how='left')
         
-        # Rellenar nans por seguridad
+        
         fill_cols_f4 = ['ndvi_valor', 'ndvi_anomalia_pct', 'rofex_precio_usd', 'rofex_volumen', 'rofex_interes_abierto']
         df_merged[fill_cols_f4] = df_merged[fill_cols_f4].ffill().fillna(0.0)
         print("  -> ¡NDVI Satelital y futuros de ROFEX integrados de forma diaria exitosamente!")
@@ -659,19 +659,19 @@ def ingest_bcp_data(modo_live=False):
         df_merged['rofex_volumen'] = 1000.0
         df_merged['rofex_interes_abierto'] = 20000.0
 
-    # Limpiar columnas finales
+    
     clean_cols = [
         'fecha', 'fase_enso', 'lluvia_mm', 'temp_media', 'precio_chicago_usd', 'precio_fob_usd', 
         'precio_fas_ars', 'precio_fas_usd', 'precio_pizarra_usd', 'tipo_cambio', 
         'rendimiento_estimado_tn_ha', 'superficie_cosechada_ha', 'anomalia_logistica_parana', 
         'basis_usd', 'precio_bb_ars', 'descargas_camiones', 'descargas_camiones_tn', 
         'descargas_vagones', 'descargas_vagones_tn', 'embarques_tn', 'brecha_cambiaria_pct',
-        # Columnas de Phase 1
+        
         'compras_se', 'compras_si', 'compras_totales', 'compras_sin_precio_pct', 'compras_sin_precio_tot',
         'delta_compras_se', 'delta_compras_si', 'delta_compras_totales', 'precio_urea_usd', 'precio_map_usd',
-        # Nuevas columnas de Phase 4 (Satelitales y Financieras)
+        
         'ndvi_valor', 'ndvi_anomalia_pct', 'rofex_precio_usd', 'rofex_volumen', 'rofex_interes_abierto',
-        # Nuevas columnas de Fase 6 (Datos en tiempo real)
+        
         'precio_blue_usd', 'precio_mep_usd', 'brecha_blue_pct', 'brecha_ccl_pct',
         'riesgo_pais_embi', 'tasa_politica_pct', 'dxy_index', 'petroleo_wti_usd',
         'cbot_maiz_usd', 'cbot_soja_usd', 'cot_managed_money_net', 'cot_commercial_net',
@@ -702,7 +702,7 @@ def ingest_bcp_data(modo_live=False):
         'descargas_vagones_tn': 'sum',
         'embarques_tn': 'sum',
         'brecha_cambiaria_pct': 'mean',
-        # Nuevas agregaciones
+        
         'compras_se': 'mean',
         'compras_si': 'mean',
         'compras_totales': 'mean',
@@ -713,13 +713,13 @@ def ingest_bcp_data(modo_live=False):
         'delta_compras_totales': 'sum',
         'precio_urea_usd': 'mean',
         'precio_map_usd': 'mean',
-        # Agregaciones de Phase 4
+        
         'ndvi_valor': 'mean',
         'ndvi_anomalia_pct': 'mean',
         'rofex_precio_usd': 'mean',
         'rofex_volumen': 'sum',
         'rofex_interes_abierto': 'mean',
-        # Agregaciones de Fase 6
+        
         'precio_blue_usd': 'mean',
         'precio_mep_usd': 'mean',
         'brecha_blue_pct': 'mean',
@@ -740,13 +740,13 @@ def ingest_bcp_data(modo_live=False):
         'nino34_anomalia': 'mean'
     }).reset_index()
     
-    # Asegurar que no hay NaNs
+    
     df_weekly = df_weekly.ffill().bfill()
     
-    # Guardar
+    
     os.makedirs('data/real', exist_ok=True)
     df_weekly.to_csv('data/real/historico_trigo_real.csv', index=False)
-    print("✅ Ingesta completada con éxito. Archivo guardado en: data/real/historico_trigo_real.csv")
+    print(" Ingesta completada con éxito. Archivo guardado en: data/real/historico_trigo_real.csv")
     print(f"Shape: {df_weekly.shape}")
     print(f"Columnas creadas: {df_weekly.columns.tolist()}")
 

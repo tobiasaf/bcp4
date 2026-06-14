@@ -7,10 +7,10 @@ from .models import SnapshotEstado
 
 def correr_montecarlo(
     motor_base: MotorSimulacion, 
-    variables_variacion: Dict[str, Tuple[float, float]], # ej: {'lluvia_mm': (media, std_dev)}
+    variables_variacion: Dict[str, Tuple[float, float]], 
     dias: int,
     n_simulaciones: int = 100,
-    seed: int = 42 # [FIX IMPORTANTE #9 - Semilla fija para reproducibilidad]
+    seed: int = 42 
 ) -> Dict[str, pd.DataFrame]:
     """
     Corre N simulaciones variando aleatoriamente las condiciones iniciales.
@@ -20,16 +20,16 @@ def correr_montecarlo(
     rng = np.random.default_rng(seed=seed)
     
     for i in range(n_simulaciones):
-        # 1. Perturbar estado inicial de forma determinista y acotada
+        
         estado_perturbado = motor_base.estado_inicial.copy()
         for var, (media, std) in variables_variacion.items():
             if var in estado_perturbado:
                 estado_perturbado[var] = rng.normal(media, std)
-                # Evitar precios o valores logísticos negativos absurdos
+                
                 if estado_perturbado[var] < 0 and media > 0:
                     estado_perturbado[var] = max(0.0, estado_perturbado[var])
         
-        # 2. Copia profunda de las reglas (ya que tienen estado mutable de disparo)
+        
         reglas_copia = copy.deepcopy(motor_base.reglas)
         motor = MotorSimulacion(
             estado_inicial=estado_perturbado,
@@ -37,14 +37,14 @@ def correr_montecarlo(
             variables_truncamiento=motor_base.variables_truncamiento
         )
         
-        # 3. Correr
+        
         historial = motor.correr(dias=dias)
         
-        # 4. Extraer serie de tiempo
+        
         df_trayectoria = pd.DataFrame([s.valores for s in historial])
         todas_trayectorias.append(df_trayectoria)
         
-    # Calcular percentiles
+    
     resultados_percentiles = {}
     variables = todas_trayectorias[0].columns
     

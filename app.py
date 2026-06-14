@@ -1,6 +1,6 @@
 import os
 import gc
-# Forzar recolección de basura al inicio / recarga de página para liberar RAM de sesiones anteriores
+
 gc.collect()
 
 os.environ['GRPC_ENABLE_FORK_SUPPORT'] = '0'
@@ -13,22 +13,22 @@ from ui.charts import plot_backtest_single
 from ui.style_eco import inject_custom_css
 import ui.charts
 
-# Configuración de página amplia estilo Bloomberg Terminal
+
 st.set_page_config(
     page_title="Paradigma V0.1 - Terminal de Simulación y Backtesting",
     layout="wide"
 )
 
-# Forzar modo economista (Bloomberg theme) por defecto
+
 st.session_state['es_economista'] = True
 
-# Inyectar CSS Bloomberg Premium
+
 inject_custom_css()
 
 st.title("Paradigma V0.1: Terminal de Simulación y Backtesting (ML Ensamble)")
 st.markdown('<p class="subtitle" style="color: #9EADB6; font-size: 1.1rem; margin-bottom: 2rem;">Simulación recursiva out-of-sample con el Ensamble de Machine Learning de 7 modelos de la BCP</p>', unsafe_allow_html=True)
 
-# 1. Cargar datos
+
 file_path_real = "data/historico_trigo_real.csv"
 if not os.path.exists(file_path_real):
     st.error("No se encontró el archivo de datos históricos reales en data/historico_trigo_real.csv.")
@@ -37,7 +37,7 @@ if not os.path.exists(file_path_real):
 df_raw = pd.read_csv(file_path_real)
 df_raw['fecha'] = pd.to_datetime(df_raw['fecha'])
 
-# Determinar campañas
+
 def obtener_campana(fecha):
     yr = fecha.year
     if fecha.month >= 6:
@@ -48,7 +48,7 @@ def obtener_campana(fecha):
 df_raw['campaña'] = df_raw['fecha'].apply(obtener_campana)
 campanas_a_predecir = ['2025/26', '2026/27']
 
-# 2. Configurar Campaña y Corte en dos columnas
+
 st.subheader("1. Configuración del Backtesting / Simulación")
 col_c1, col_c2 = st.columns(2)
 
@@ -60,11 +60,11 @@ with col_c1:
         help="El modelo se entrenará con toda la historia previa y simulará la temporada completa."
     )
 
-# Calcular fecha de corte (1 de junio del año de inicio)
+
 año_inicio = int(campana_seleccionada.split('/')[0])
 fecha_corte = pd.to_datetime(f"{año_inicio}-06-01").date()
 
-# Calcular semanas de avance disponibles
+
 fecha_inicio_campana = pd.to_datetime(f"{año_inicio}-06-01")
 fecha_fin_campana = pd.to_datetime(f"{año_inicio + 1}-02-01")
 df_campana_test = df_raw[(df_raw['fecha'] >= fecha_inicio_campana) & (df_raw['fecha'] <= fecha_fin_campana)].sort_values('fecha')
@@ -102,7 +102,7 @@ with col_c2:
         )
         fecha_proyeccion = opciones_avance[avance_seleccionado]
 
-# 3. MODO EN VIVO 2026/27 (Escenarios agronómicos/financieros)
+
 clima_scenario = "Neutral Promedio"
 chicago_scenario_val = None
 devaluacion_mensual_pct = 2.0
@@ -140,18 +140,18 @@ if campana_seleccionada == '2026/27':
             help="Define el ritmo de deslizamiento cambiario para simular la brecha y el tipo de cambio oficial."
         )
 
-# Definición estática de parámetros predeterminados de la simulación
+
 exogenas = ['tipo_cambio', 'precio_chicago_usd', 'lluvia_mm', 'temp_media']
 stress_weights = None
 
-# Nota informativa sobre tiempo de ejecución
+
 st.warning("""
-**Nota de Ejecución:** Debido a que el simulador entrena 7 modelos de Machine Learning en paralelo (incluyendo VECM, GARCH, Markov Switching, Elastic Net, Redes Neuronales MLP, Procesos Gaussianos y Modelos Fundacionales) para realizar una simulación recursiva paso a paso, el proceso tomará **entre 1 y 2 minutos**. Por favor, no recargue la página mientras se ejecuta.
+**Nota de Ejecución:** Debido a que el simulador entrena 7 modelos de Machine Learning en paralelo (incluyendo VECM, GARCH, Markov Switching, Elastic Net, Redes Neuronales MLP, Procesos Gaussianos y Modelos Fundacionales) para realizar una simulación recursiva paso a paso, el proceso tomará **entre 10 y 15 minutos**. Por favor, no recargue la página mientras se ejecuta.
 
 **Nota de Producción:** *En un entorno de producción real, este proceso tardaría menos de 5 segundos*, ya que los modelos estarían pre-entrenados y persistidos en un servidor. Aquí, al no contar con un servidor con estado para guardar los pesos de los modelos, cada ejecución requiere entrenar todo el stack desde cero en la nube de Streamlit.
 """)
 
-# 4. Botón de ejecución
+
 if st.button("Ejecutar Backtesting / Simulación con Ensamble ML", type="primary", use_container_width=True):
     st.session_state.resultados_backtest_integral = None
     import gc
@@ -186,7 +186,7 @@ if st.button("Ejecutar Backtesting / Simulación con Ensamble ML", type="primary
         status_text.empty()
         st.error(f"Error durante la simulación: {e}")
 
-# 5. Renderizar resultados con gráficos premium
+
 if st.session_state.get('resultados_backtest_integral'):
     res = st.session_state.resultados_backtest_integral
     
@@ -194,7 +194,7 @@ if st.session_state.get('resultados_backtest_integral'):
     st.header("Resultados de Backtesting: Simulación vs Realidad")
     
     if campana_seleccionada != '2026/27':
-        # Tabla de métricas de precisión
+        
         st.subheader("Métricas de Error Fuera de Muestra (Out of Sample)")
         metricas = []
         for target, data in res.items():
@@ -224,33 +224,33 @@ if st.session_state.get('resultados_backtest_integral'):
                 "Dado que estás proyectando la campaña futura 2026/27, no existen datos reales observados todavía para "
                 "contrastar (MAE/MAPE/R² no disponibles). Se presentan a continuación las trayectorias proyectadas por el Ensamble y sus bandas de confianza.")
 
-    # Multiselect de modelos individuales para mostrar
+    
     st.markdown("---")
     st.subheader("Visualización del Ensamble y Modelos del Stack")
     modelos_disponibles = ["VECM", "Markov Switching", "HGBR (Direct)", "Elastic Net", "MLP Neural Network", "Gaussian Process", "Modelos Fundacionales (Zero-Shot)"]
     mostrar_individuales = st.multiselect(
         "Selecciona modelos individuales para superponer en los gráficos (líneas punteadas):",
         options=modelos_disponibles,
-        default=modelos_disponibles[:3],  # Por defecto mostramos algunos para evitar ruido visual
+        default=modelos_disponibles[:3],  
         help="Permite inspeccionar el aporte individual de los modelos base al promedio ponderado dinámico."
     )
     
-    # Mostrar gráficos principales de trayectoria
+    
     st.subheader("Gráficos de Proyección vs Realidad")
     
-    # 1. Precios (FAS USD)
+    
     if 'precio_fas_usd' in res:
         df_comp_fas = res['precio_fas_usd']['df_comparacion']
         fig_fas = plot_backtest_single(df_comp_fas, "Precio Trigo FAS Local (USD/tn) - Simulación vs Realidad", "Precio (USD/tn)", fecha_proyeccion=fecha_proyeccion, modelos_a_mostrar=mostrar_individuales)
         st.plotly_chart(fig_fas, use_container_width=True)
         
-    # 2. Precios (FOB USD)
+    
     if 'precio_fob_usd' in res:
         df_comp_fob = res['precio_fob_usd']['df_comparacion']
         fig_fob = plot_backtest_single(df_comp_fob, "Precio Trigo FOB Oficial (USD/tn) - Simulación vs Realidad", "Precio (USD/tn)", fecha_proyeccion=fecha_proyeccion, modelos_a_mostrar=mostrar_individuales)
         st.plotly_chart(fig_fob, use_container_width=True)
  
-    # 3. Flujo Logístico (Camiones)
+    
     col_log1, col_log2 = st.columns(2)
     with col_log1:
         if 'descargas_camiones' in res:
@@ -258,21 +258,21 @@ if st.session_state.get('resultados_backtest_integral'):
             fig_cam = plot_backtest_single(df_comp_cam, "Descarga de Camiones Diaria (Puerto)", "Camiones/Día", fecha_proyeccion=fecha_proyeccion, modelos_a_mostrar=[])
             st.plotly_chart(fig_cam, use_container_width=True)
             
-    # 4. Rendimiento Estimado (tn/ha)
+    
     with col_log2:
         if 'rendimiento_estimado_tn_ha' in res:
             df_comp_rinde = res['rendimiento_estimado_tn_ha']['df_comparacion']
             fig_rinde = plot_backtest_single(df_comp_rinde, "Rendimiento Estimado (tn/ha)", "tn/ha", fecha_proyeccion=fecha_proyeccion, modelos_a_mostrar=[])
             st.plotly_chart(fig_rinde, use_container_width=True)
  
-    # Volatilidad GARCH(1,1)
+    
     if 'df_garch' in res:
         st.markdown("---")
         st.subheader("Volatilidad Condicional GARCH(1,1) de Precios")
         fig_garch = ui.charts.plot_garch_volatility(res['df_garch'], "Desvío Estándar Condicional Estimado (σ_t)")
         st.plotly_chart(fig_garch, use_container_width=True)
         
-    # Evolución del Ensamble DMA
+    
     if 'pesos_dma_fob' in res and len(res['pesos_dma_fob']) > 0:
         import plotly.graph_objects as go
         st.markdown("---")
