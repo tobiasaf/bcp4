@@ -1,5 +1,6 @@
 import os
 import gc
+from PIL import Image
 
 gc.collect()
 
@@ -13,10 +14,11 @@ from ui.charts import plot_backtest_single
 from ui.style_eco import inject_custom_css
 import ui.charts
 
+logo_img = Image.open("ui/logo.png")
 
 st.set_page_config(
     page_title="Paradigma V0.1",
-    page_icon="ui/logo.png",
+    page_icon=logo_img,
     layout="wide"
 )
 
