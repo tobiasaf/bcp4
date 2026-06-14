@@ -46,12 +46,7 @@ def obtener_campana(fecha):
         return f"{yr-1}/{str(yr)[2:]}"
 
 df_raw['campaña'] = df_raw['fecha'].apply(obtener_campana)
-campanas_disponibles = sorted(df_raw['campaña'].unique())
-campanas_a_predecir = [c for c in campanas_disponibles if c >= "2021/22"]
-
-# Asegurar que la campaña 2026/27 esté en las opciones
-if '2026/27' not in campanas_a_predecir:
-    campanas_a_predecir.append('2026/27')
+campanas_a_predecir = ['2025/26', '2026/27']
 
 # 2. Configurar Campaña y Corte en dos columnas
 st.subheader("1. Configuración del Backtesting / Simulación")
@@ -249,19 +244,16 @@ if st.session_state.get('resultados_backtest_integral'):
                 metricas.append({
                     'Variable': f"{target} (Exógena)",
                     '🎯 MAPE Test': "0.0% (Inyectado)",
-                    'Calidad': "Exógena",
                     'MAE Test': "N/A",
                     'R² Aislado': "N/A",
                 })
                 continue
                 
             mape = data['mape_test']
-            semaforo = "✅ Excelente" if mape < 10 else "🟡 Aceptable" if mape < 25 else "🔴 Pobre"
             
             metricas.append({
                 'Variable': target,
                 '🎯 MAPE Test': f"{mape:.1f}%" if not pd.isna(mape) else "N/A",
-                'Calidad': semaforo,
                 'MAE Test': f"{data['mae_test']:.2f}",
                 'R² Aislado': f"{data['r2_train']:.2f}",
             })
