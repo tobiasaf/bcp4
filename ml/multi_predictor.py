@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import sys
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable
 from sklearn.metrics import r2_score, mean_absolute_error
 from sklearn.linear_model import ElasticNetCV, ElasticNet
 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -252,7 +252,8 @@ def entrenar_y_predecir_todo(
     clima_scenario: str = "Neutral Promedio",
     chicago_scenario_val: float = None,
     devaluacion_mensual_pct: float = 2.0,
-    stress_weights: List[float] = None
+    stress_weights: List[float] = None,
+    progress_callback: Callable[[int, str], None] = None
 ) -> Dict[str, Any]:
     """
     Entrena el ensamble matemático BCP (VECM, GARCH, Markov Switching, HGBR, ElasticNet)
@@ -260,6 +261,9 @@ def entrenar_y_predecir_todo(
     
     Integración Causal con rule_extractor al final.
     """
+    if progress_callback:
+        progress_callback(0, "Iniciando procesamiento de datos y saneamiento...")
+
     if variables_exogenas is None:
         variables_exogenas = []
     if fecha_proyeccion is None:
@@ -267,6 +271,9 @@ def entrenar_y_predecir_todo(
 
     # 0. Procesamiento base y saneamiento sin data leakage
     df_proc_full = procesar_datos_bcp(df_raw)
+    
+    if progress_callback:
+        progress_callback(5, "Ajustando modelo VECM para FOB/FAS...")
     
     # Divisiones temporales
     df_proc_full_train = df_proc_full[df_proc_full['fecha'] < pd.to_datetime(fecha_corte)].copy()
@@ -329,6 +336,8 @@ def entrenar_y_predecir_todo(
     vecm_fit = vecm_model.fit()
     
     # 2. Ajustar GARCH(1,1) sobre los residuos del VECM
+    if progress_callback:
+        progress_callback(12, "Ajustando volatilidad condicional con GARCH...")
     print("- Ajustando GARCH...")
     resid_fob = vecm_fit.resid[:, 0]
     garch_model_fob = arch_model(resid_fob * 100, vol='Garch', p=1, q=1, dist='skewt')
@@ -339,6 +348,8 @@ def entrenar_y_predecir_todo(
     garch_fit_fas = garch_model_fas.fit(disp='off')
     
     # 3. Ajustar Markov Switching
+    if progress_callback:
+        progress_callback(18, "Ajustando modelo de Regresión de Cambio de Régimen de Markov...")
     print("- Ajustando Markov Switching...")
     cols_ms_exog = ['precio_chicago_usd', 'rendimiento_estimado_tn_ha', 'lluvia_mm']
     ms_success = False
@@ -364,6 +375,8 @@ def entrenar_y_predecir_todo(
         print(f"  Error ajustando Markov: {e}")
         
     # 4. Ajustar Elastic Net CV con features normalizadas
+    if progress_callback:
+        progress_callback(25, "Buscando hiperparámetros óptimos para Elastic Net CV...")
     print("- Ajustando Elastic Net CV...")
     cols_predictoras_base = [c for c in df_proc_full_train.columns if c not in ['fecha', 'fob_premium', 'fas_discount'] and ('_lag_' in c or '_rolling_' in c)]
     
@@ -385,6 +398,8 @@ def entrenar_y_predecir_todo(
     print(f"  EN CV FAS: alpha={alpha_fas:.4f}, l1_ratio={l1_ratio_fas:.4f}")
     
     # 5. Entrenar modelos de Direct Multi-Step Forecasting para horizontes 1..35
+    if progress_callback:
+        progress_callback(32, "Iniciando entrenamiento de 280 regresores Direct Multi-Step...")
     print("- Entrenando modelos Direct Multi-Step...")
     hgbr_models_fob = {}
     hgbr_models_fas = {}
@@ -396,6 +411,10 @@ def entrenar_y_predecir_todo(
     gpr_models_fas = {}
     
     for h in range(1, 36):
+        if progress_callback:
+            pct = int(32 + (h * 30 / 35))
+            progress_callback(pct, f"Entrenando regresores Direct Multi-Step: horizonte {h}/35...")
+            
         y_fob_h = df_proc_full_train['fob_premium'].shift(-h)
         y_fas_h = df_proc_full_train['fas_discount'].shift(-h)
         
@@ -447,6 +466,8 @@ def entrenar_y_predecir_todo(
             
     # 6. Calibración Out-of-Sample honesta de pesos del Meta-Learner en el set de calibración
     # [FIX CRÍTICO #5 y CRÍTICO #6]
+    if progress_callback:
+        progress_callback(63, "Calibrando pesos de modelos individuales y Conformal Prediction...")
     print("- Calibrando pesos del Meta-Learner (Out-of-Sample)...")
     n_calib = max(10, int(len(df_proc_full_train) * 0.25))
     df_train_fit = df_proc_full_train.iloc[:-n_calib]
@@ -702,6 +723,8 @@ def entrenar_y_predecir_todo(
     r2_tr_fas = r2_score(y_calib_fas, ensemble_pred_calib_fas)
 
     # --- RE-AJUSTE PARA FUERA DE MUESTRA REALINEADO CON FECHA_PROYECCION ---
+    if progress_callback:
+        progress_callback(75, "Re-ajustando modelos condicionados hasta la fecha de corte...")
     df_history_up_to_proj = df_proc_full[df_proc_full['fecha'] < pd.to_datetime(fecha_proyeccion)].copy()
     print(f"- Re-ajustando VECM/GARCH/Markov condicionado hasta {fecha_proyeccion}...")
     Y_vecm_proj = df_history_up_to_proj[cols_vecm].dropna()
@@ -737,6 +760,8 @@ def entrenar_y_predecir_todo(
 
     # 1. Desestacionalizar variables logísticas en train
     # Los factores estacionales usan mediana (más robusta ante outliers).
+    if progress_callback:
+        progress_callback(80, "Entrenando regresores para variables logísticas y comerciales...")
     df_proc_full_train = df_proc_full_train.copy()
     meses_proc = df_proc_full_train['fecha'].dt.month
     for col in ['descargas_camiones', 'descargas_vagones', 'embarques_tn']:
@@ -809,6 +834,8 @@ def entrenar_y_predecir_todo(
         conformal_quantiles[target] = float(q_val)
         
     # --- SIMULACIÓN AUTOREGRESIVA PASO A PASO ---
+    if progress_callback:
+        progress_callback(85, "Iniciando simulación recursiva paso a paso...")
     df_historia_pre_proyeccion = df_proc_full[
         (df_proc_full['fecha'] >= pd.to_datetime(fecha_corte)) & 
         (df_proc_full['fecha'] < pd.to_datetime(fecha_proyeccion))
@@ -852,6 +879,10 @@ def entrenar_y_predecir_todo(
     historial_pesos_dma_fas = []
     
     for paso_idx, fecha_actual in enumerate(fechas_test):
+        if progress_callback:
+            pct = int(85 + (paso_idx * 10 / len(fechas_test)))
+            progress_callback(pct, f"Simulando paso {paso_idx + 1}/{len(fechas_test)}: {pd.to_datetime(fecha_actual).strftime('%d-%b-%Y')}...")
+            
         es_periodo_proyeccion = fecha_actual >= pd.to_datetime(fecha_proyeccion)
         
         if not es_periodo_proyeccion:
@@ -1659,6 +1690,8 @@ def entrenar_y_predecir_todo(
             }
 
     # --- INTEGRACIÓN CAUSAL ML -> ENGINE (CRÍTICO #8) ---
+    if progress_callback:
+        progress_callback(96, "Calculando importancia de variables y extrayendo reglas de causalidad...")
     try:
         from ml.rule_extractor import modelo_a_reglas
         from sklearn.inspection import permutation_importance
@@ -1737,4 +1770,6 @@ def entrenar_y_predecir_todo(
     except Exception:
         pass
             
+    if progress_callback:
+        progress_callback(100, "¡Simulación completada con éxito!")
     return resultados_backtest

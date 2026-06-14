@@ -186,29 +186,44 @@ if modo_pesos == "Stress Testing (Ponderación Estática Manual)":
 st.markdown("---")
 
 # Nota informativa sobre tiempo de ejecución
-st.warning("⏱️ **Nota de Ejecución:** Debido a que el simulador entrena 7 modelos de Machine Learning en paralelo, el cálculo y la simulación recursiva tomará **entre 1 y 2 minutos**. Por favor, no recargue la página mientras se ejecuta.")
+st.warning("""
+⏱️ **Nota de Ejecución:** Debido a que el simulador entrena 7 modelos de Machine Learning en paralelo (incluyendo VECM, GARCH, Markov Switching, Elastic Net, Redes Neuronales MLP, Procesos Gaussianos y Modelos Fundacionales) para realizar una simulación recursiva paso a paso, el proceso tomará **entre 1 y 2 minutos**. Por favor, no recargue la página mientras se ejecuta.
+
+💡 **Nota de Producción:** *En un entorno de producción real, este proceso tardaría menos de 5 segundos*, ya que los modelos estarían pre-entrenados y persistidos en un servidor. Aquí, al no contar con un servidor con estado para guardar los pesos de los modelos, cada ejecución requiere entrenar todo el stack desde cero en la nube de Streamlit.
+""")
 
 # 4. Botón de ejecución
 if st.button("Ejecutar Backtesting / Simulación con Ensamble ML", type="primary", use_container_width=True):
     st.session_state.resultados_backtest_integral = None
     
-    with st.spinner(f"Entrenando modelos y corriendo predicciones fuera de muestra (out-of-sample) a partir de {fecha_proyeccion}..."):
-        try:
-            resultados = entrenar_y_predecir_todo(
-                df_raw,
-                str(fecha_corte),
-                variables_exogenas=exogenas,
-                predecir_diferencias=False,
-                fecha_proyeccion=str(fecha_proyeccion),
-                clima_scenario=clima_scenario,
-                chicago_scenario_val=chicago_scenario_val,
-                devaluacion_mensual_pct=devaluacion_mensual_pct,
-                stress_weights=stress_weights
-            )
-            st.session_state.resultados_backtest_integral = resultados
-            st.success("Simulación completada con éxito.")
-        except Exception as e:
-            st.error(f"Error durante la simulación: {e}")
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    def update_progress(pct, msg):
+        progress_bar.progress(pct)
+        status_text.text(f"⏳ {msg} ({pct}%)")
+        
+    try:
+        resultados = entrenar_y_predecir_todo(
+            df_raw,
+            str(fecha_corte),
+            variables_exogenas=exogenas,
+            predecir_diferencias=False,
+            fecha_proyeccion=str(fecha_proyeccion),
+            clima_scenario=clima_scenario,
+            chicago_scenario_val=chicago_scenario_val,
+            devaluacion_mensual_pct=devaluacion_mensual_pct,
+            stress_weights=stress_weights,
+            progress_callback=update_progress
+        )
+        st.session_state.resultados_backtest_integral = resultados
+        progress_bar.empty()
+        status_text.empty()
+        st.success("Simulación completada con éxito.")
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"Error durante la simulación: {e}")
 
 # 5. Renderizar resultados con gráficos premium
 if st.session_state.get('resultados_backtest_integral'):
