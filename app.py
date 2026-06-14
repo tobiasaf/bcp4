@@ -15,7 +15,8 @@ import ui.charts
 
 
 st.set_page_config(
-    page_title="Paradigma V0.1 - Terminal de Simulación y Backtesting",
+    page_title="Paradigma V0.1",
+    page_icon="ui/logo.png",
     layout="wide"
 )
 
@@ -25,7 +26,11 @@ st.session_state['es_economista'] = True
 
 inject_custom_css()
 
-st.title("Paradigma V0.1: Terminal de Simulación y Backtesting (ML Ensamble)")
+col_logo, col_title = st.columns([1, 15])
+with col_logo:
+    st.image("ui/logo.png", width=65)
+with col_title:
+    st.title("Paradigma V0.1: Terminal de Simulación y Backtesting (ML Ensamble)")
 st.markdown('<p class="subtitle" style="color: #9EADB6; font-size: 1.1rem; margin-bottom: 2rem;">Simulación recursiva out-of-sample con el Ensamble de Machine Learning de 7 modelos de la BCP</p>', unsafe_allow_html=True)
 
 
