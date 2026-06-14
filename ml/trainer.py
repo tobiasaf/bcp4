@@ -6,7 +6,7 @@ from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
 from sklearn.inspection import permutation_importance
 from typing import Dict, Tuple, Any
 
-def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predictoras: list, fecha_corte: str = None, predecir_diferencias: bool = False) -> Dict[str, Any]:
+def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predictoras: list, fecha_corte: str = None, predecir_diferencias: bool = False, calcular_importancia: bool = False) -> Dict[str, Any]:
     """
     Entrena un modelo HistGradientBoostingRegressor Avanzado.
     Usa RandomizedSearchCV y TimeSeriesSplit para explorar hiperparámetros 
@@ -91,20 +91,25 @@ def entrenar_modelo(df: pd.DataFrame, variable_objetivo: str, variables_predicto
     rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
     
     # Feature Importances: HGBR no tiene feature_importances_ directo
-    # Calculamos la importancia por permutación (más preciso matemáticamente)
-    result = permutation_importance(modelo, X_train, y_train, n_repeats=5, random_state=42, n_jobs=1)
-    
-    importancias = pd.DataFrame({
-        'feature': variables_predictoras,
-        'importancia': result.importances_mean
-    }).sort_values('importancia', ascending=False)
-    
-    # Normalizar para que sume 1 (o cerca) y los gráficos se vean consistentes
-    total_imp = importancias['importancia'].sum()
-    if total_imp > 0:
-        importancias['importancia'] = importancias['importancia'] / total_imp
+    # Calculamos la importancia por permutación (más preciso matemáticamente) solo si se requiere
+    if calcular_importancia:
+        result = permutation_importance(modelo, X_train, y_train, n_repeats=5, random_state=42, n_jobs=1)
+        importancias = pd.DataFrame({
+            'feature': variables_predictoras,
+            'importancia': result.importances_mean
+        }).sort_values('importancia', ascending=False)
+        
+        # Normalizar para que sume 1 (o cerca) y los gráficos se vean consistentes
+        total_imp = importancias['importancia'].sum()
+        if total_imp > 0:
+            importancias['importancia'] = importancias['importancia'] / total_imp
+        else:
+            importancias['importancia'] = 1.0 / len(importancias)
     else:
-        importancias['importancia'] = 1.0 / len(importancias)
+        importancias = pd.DataFrame({
+            'feature': variables_predictoras,
+            'importancia': 1.0 / len(variables_predictoras)
+        })
     
     # Guardar resultados para backtesting visual
     df_backtest = pd.DataFrame({

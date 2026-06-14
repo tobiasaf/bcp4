@@ -777,7 +777,11 @@ def entrenar_y_predecir_todo(
     
     cols_ml_puros = [c for c in cols_a_predecir if c not in ['superficie_cosechada_ha', 'fob_premium', 'fas_discount']]
     
-    for target in cols_ml_puros:
+    for idx_target, target in enumerate(cols_ml_puros):
+        if progress_callback:
+            pct = int(80 + (idx_target * 4 / len(cols_ml_puros)))
+            progress_callback(pct, f"Entrenando regresor complementario: {target}...")
+            
         cols_predictoras = [
             c for c in df_proc_full_train.columns 
             if _es_feature_valida(c, target, cols_ignorar, variables_exogenas)
@@ -795,7 +799,8 @@ def entrenar_y_predecir_todo(
             (df_proc_full_train['fecha'] >= pd.to_datetime(fecha_corte))
         ].copy()
         
-        res = entrenar_modelo(df_train_active, target, cols_predictoras, fecha_corte=fecha_corte, predecir_diferencias=False)
+        # OMITIMOS calcular_importancia (calcular_importancia=False) para evitar cuellos de botella de tiempo
+        res = entrenar_modelo(df_train_active, target, cols_predictoras, fecha_corte=fecha_corte, predecir_diferencias=False, calcular_importancia=False)
         modelos[target] = res['modelo']
         metricas_train[target] = {'r2': res['r2'], 'mae': res['mae']}
         
